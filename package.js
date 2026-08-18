@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "pino": "^9.0.0",
     "socket.io": "^4.7.5",
