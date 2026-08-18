@@ -6,12 +6,193 @@ const fs = require('fs');
 const CONFIG = {
     PREFIX: '.',
     BOT_NAME: 'Runner SLENZ',
+    OWNER_NUMBER: '233xxxxxxxx',
     AUTO_STATUS_SEEN: true,
-    AUTO_REACT: false, // Turned off as requested
+    AUTO_REACT: false,
     REJECT_CALLS: true,
     REJECT_MSG: '*📞 Calls are not allowed on this bot number.*'
 };
 
+// ==========================================
+// 1. COMMAND REGISTRY (STRUCTURED DESIGN)
+// ==========================================
+const COMMANDS = [
+    // GENERAL / INFO
+    {
+        name: 'ping',
+        category: '📌 GENERAL',
+        desc: 'Check bot latency',
+        groupOnly: false,
+        exec: async ({ sock, from }) => {
+            await sock.sendMessage(from, { text: '🏓 Pong! Bot is active.' });
+        }
+    },
+    {
+        name: 'runtime',
+        category: '📌 GENERAL',
+        desc: 'Check server uptime',
+        groupOnly: false,
+        exec: async ({ sock, from }) => {
+            const uptime = Math.floor(process.uptime());
+            await sock.sendMessage(from, { text: `⏱️ Active Uptime: ${uptime} seconds` });
+        }
+    },
+    {
+        name: 'owner',
+        category: '📌 GENERAL',
+        desc: 'Get owner contact info',
+        groupOnly: false,
+        exec: async ({ sock, from }) => {
+            await sock.sendMessage(from, { text: `👑 Owner Contact: ${CONFIG.OWNER_NUMBER}` });
+        }
+    },
+
+    // MEDIA & TOOLS
+    {
+        name: 'play',
+        category: '🎵 MEDIA & TOOLS',
+        desc: 'Search YouTube for audio/video info',
+        groupOnly: false,
+        exec: async ({ sock, from, args }) => {
+            const query = args.join(' ');
+            if (!query) return await sock.sendMessage(from, { text: '⚠️ Please provide a search term.' });
+            const r = await yts(query);
+            const video = r.videos[0];
+            if (!video) return await sock.sendMessage(from, { text: '❌ No results found.' });
+            
+            const caption = `🎵 *${video.title}*\n⏱️ Duration: ${video.timestamp}\n🔗 Link: ${video.url}`;
+            await sock.sendMessage(from, { image: { url: video.thumbnail }, caption });
+        }
+    },
+    {
+        name: 'vv',
+        category: '🎵 MEDIA & TOOLS',
+        desc: 'Unlock View-Once images/videos',
+        groupOnly: false,
+        exec: async ({ sock, from, msg }) => {
+            const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            const viewOnce = quoted?.viewOnceMessageV2?.message || quoted?.viewOnceMessage?.message;
+            if (!viewOnce) return await sock.sendMessage(from, { text: '⚠️ Reply to a View-Once message.' });
+
+            const type = Object.keys(viewOnce)[0];
+            const stream = await downloadContentFromMessage(viewOnce[type], type.replace('Message', ''));
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+            if (type === 'imageMessage') await sock.sendMessage(from, { image: buffer, caption: '🔓 View Once Unlocked' });
+            if (type === 'videoMessage') await sock.sendMessage(from, { video: buffer, caption: '🔓 View Once Unlocked' });
+        }
+    },
+
+    // GROUP ADMIN
+    {
+        name: 'kick',
+        category: '👑 GROUP ADMIN',
+        desc: 'Remove user from group',
+        groupOnly: true,
+        exec: async ({ sock, from, mentioned }) => {
+            if (!mentioned[0]) return await sock.sendMessage(from, { text: '⚠️ Mention a user to kick.' });
+            await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
+            await sock.sendMessage(from, { text: '✅ Member removed successfully.' });
+        }
+    },
+    {
+        name: 'promote',
+        category: '👑 GROUP ADMIN',
+        desc: 'Promote user to admin',
+        groupOnly: true,
+        exec: async ({ sock, from, mentioned }) => {
+            if (!mentioned[0]) return await sock.sendMessage(from, { text: '⚠️ Mention a user to promote.' });
+            await sock.groupParticipantsUpdate(from, [mentioned[0]], 'promote');
+            await sock.sendMessage(from, { text: '✅ Member promoted to admin.' });
+        }
+    },
+    {
+        name: 'demote',
+        category: '👑 GROUP ADMIN',
+        desc: 'Demote admin to member',
+        groupOnly: true,
+        exec: async ({ sock, from, mentioned }) => {
+            if (!mentioned[0]) return await sock.sendMessage(from, { text: '⚠️ Mention an admin to demote.' });
+            await sock.groupParticipantsUpdate(from, [mentioned[0]], 'demote');
+            await sock.sendMessage(from, { text: '✅ Admin demoted.' });
+        }
+    },
+    {
+        name: 'hidetag',
+        category: '👑 GROUP ADMIN',
+        desc: 'Tag all group participants',
+        groupOnly: true,
+        exec: async ({ sock, from, args, participants }) => {
+            const tagText = args.join(' ') || 'Attention everyone!';
+            const jids = participants.map(p => p.id);
+            await sock.sendMessage(from, { text: tagText, mentions: jids });
+        }
+    },
+    {
+        name: 'link',
+        category: '👑 GROUP ADMIN',
+        desc: 'Get group invite link',
+        groupOnly: true,
+        exec: async ({ sock, from }) => {
+            const code = await sock.groupInviteCode(from);
+            await sock.sendMessage(from, { text: `🔗 Group Link: https://chat.whatsapp.com/${code}` });
+        }
+    },
+
+    // FUN & GAMES
+    {
+        name: 'joke',
+        category: '🎮 FUN & GAMES',
+        desc: 'Get a random joke',
+        groupOnly: false,
+        exec: async ({ sock, from }) => {
+            const jokes = [
+                "Why don't scientists trust atoms? Because they make up everything!",
+                "What do you call a fake noodle? An impasta!",
+                "Why did the computer go to the doctor? Because it had a virus!"
+            ];
+            const random = jokes[Math.floor(Math.random() * jokes.length)];
+            await sock.sendMessage(from, { text: `😂 ${random}` });
+        }
+    },
+    {
+        name: 'roll',
+        category: '🎮 FUN & GAMES',
+        desc: 'Roll a 6-sided dice',
+        groupOnly: false,
+        exec: async ({ sock, from }) => {
+            const roll = Math.floor(Math.random() * 6) + 1;
+            await sock.sendMessage(from, { text: `🎲 You rolled a ${roll}!` });
+        }
+    }
+];
+
+// ==========================================
+// 2. DYNAMIC MENU GENERATOR
+// ==========================================
+function buildMenu() {
+    let menuText = `⚡ *${CONFIG.BOT_NAME} DASHBOARD* ⚡\n`;
+    menuText += `Prefix: [ ${CONFIG.PREFIX} ]\n\n`;
+
+    const categories = [...new Set(COMMANDS.map(c => c.category))];
+
+    categories.forEach(cat => {
+        menuText += `┌─── ${cat}\n`;
+        const catCmds = COMMANDS.filter(c => c.category === cat);
+        catCmds.forEach(cmd => {
+            menuText += `│ ➣ ${CONFIG.PREFIX}${cmd.name} - ${cmd.desc}\n`;
+        });
+        menuText += `└───\n\n`;
+    });
+
+    menuText += `_Type ${CONFIG.PREFIX}<command> to run._`;
+    return menuText;
+}
+
+// ==========================================
+// 3. MAIN BOT ENGINE
+// ==========================================
 async function startBot(phone, io, socket) {
     const authFolder = 'auth_info_runner_slenz';
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
@@ -30,6 +211,7 @@ async function startBot(phone, io, socket) {
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
     let codeRequested = false;
 
+    // Connection Manager
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
@@ -71,7 +253,7 @@ async function startBot(phone, io, socket) {
         }
     });
 
-    // Auto Call Reject
+    // Auto Call Rejection
     sock.ev.on('call', async (calls) => {
         if (!CONFIG.REJECT_CALLS) return;
         for (const call of calls) {
@@ -82,13 +264,14 @@ async function startBot(phone, io, socket) {
         }
     });
 
-    // Message Listener
+    // Message Router & Executor
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
 
             const from = msg.key.remoteJid;
+            const isGroup = from.endsWith('@g.us');
 
             // Auto Status Read
             if (from === 'status@broadcast' && CONFIG.AUTO_STATUS_SEEN) {
@@ -100,73 +283,36 @@ async function startBot(phone, io, socket) {
             if (!text.startsWith(CONFIG.PREFIX)) return;
 
             const args = text.slice(CONFIG.PREFIX.length).split(/ +/);
-            const cmd = args.shift().toLowerCase();
+            const commandName = args.shift().toLowerCase();
 
-            // --- 100+ COMMAND MENU ---
-            if (cmd === 'menu' || cmd === 'help') {
-                const menu = 
-`⚡ *${CONFIG.BOT_NAME} DASHBOARD* ⚡
-Prefix: [ ${CONFIG.PREFIX} ]
-
-┌─── 📌 *GENERAL (10)*
-│ .ping .runtime .speed .owner .botinfo
-│ .sysinfo .donate .rules .group .support
-├─── 🎵 *DOWNLOADS (15)*
-│ .play .song .ytmp3 .ytmp4 .video .yts
-│ .tik .tiktok .ig .instagram .fb .facebook
-│ .apk .mediafire .spotify
-├─── 🎨 *CONVERTERS & MEDIA (15)*
-│ .sticker .s .toimg .tomp3 .tovideo .gif
-│ .vv (Unlock ViewOnce) .tourl .crop .circle
-│ .blur .grey .invert .emojimix .reverse
-├─── 👑 *GROUP ADMIN (20)*
-│ .kick .add .promote .demote .mute .unmute
-│ .link .revoke .groupinfo .subject .desc
-│ .tagall .hidetag .admins .warn .unwarn
-│ .resetwarns .pin .unpin .poll
-├─── 🤖 *AI & TOOLS (20)*
-│ .ai .gpt .gemini .translate .tr .calc
-│ .weather .wiki .shorturl .qrcode .pdf
-│ .ssweb .define .quote .fact .math .code
-│ .say .tts
-└─── 🎮 *GAMES & FUN (20)*
-│ .joke .dare .truth .roll .coin .ship
-│ .rate .compatibility .8ball .slot .hack
-│ .gay .lesbian .smart .handsome .ugly
-│ .roast .iq .simi .quiz
-
-_Type ${CONFIG.PREFIX}<command> to execute._`;
-                return await sock.sendMessage(from, { text: menu });
+            // Handle Menu Request
+            if (commandName === 'menu' || commandName === 'help') {
+                return await sock.sendMessage(from, { text: buildMenu() });
             }
 
-            // Core Command Handlers
-            if (cmd === 'ping') await sock.sendMessage(from, { text: '🏓 Pong!' });
+            // Find Command in Registry
+            const targetCmd = COMMANDS.find(c => c.name === commandName);
+            if (!targetCmd) return;
 
-            if (cmd === 'vv') {
-                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                const viewOnce = quoted?.viewOnceMessageV2?.message || quoted?.viewOnceMessage?.message;
-                if (!viewOnce) return await sock.sendMessage(from, { text: '⚠️ Reply to a View Once media.' });
-
-                const type = Object.keys(viewOnce)[0];
-                const stream = await downloadContentFromMessage(viewOnce[type], type.replace('Message', ''));
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                if (type === 'imageMessage') await sock.sendMessage(from, { image: buffer, caption: '🔓 View Once Unlocked' });
-                if (type === 'videoMessage') await sock.sendMessage(from, { video: buffer, caption: '🔓 View Once Unlocked' });
+            // Group Enforcement Check
+            if (targetCmd.groupOnly && !isGroup) {
+                return await sock.sendMessage(from, { text: '⚠️ This command can only be used in group chats.' });
             }
 
-            if (cmd === 'play' || cmd === 'song') {
-                const query = args.join(' ');
-                if (!query) return await sock.sendMessage(from, { text: '⚠️ Enter a song name.' });
-                const r = await yts(query);
-                const video = r.videos[0];
-                if (!video) return await sock.sendMessage(from, { text: '❌ Not found.' });
-                await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: `🎵 *${video.title}*\n⏱️ ${video.timestamp}\n🔗 ${video.url}` });
+            // Gather Context Variables
+            let participants = [];
+            if (isGroup) {
+                const groupMetadata = await sock.groupMetadata(from);
+                participants = groupMetadata.participants;
             }
+
+            const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+            // Execute Registered Command Logic
+            await targetCmd.exec({ sock, from, msg, args, isGroup, participants, mentioned });
 
         } catch (err) {
-            console.error('Message Error:', err);
+            console.error('Command Execution Error:', err);
         }
     });
 
@@ -174,4 +320,4 @@ _Type ${CONFIG.PREFIX}<command> to execute._`;
 }
 
 module.exports = { startBot };
-                                         
+                                                             
