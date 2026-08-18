@@ -7,10 +7,9 @@ const CONFIG = {
     PREFIX: '.',
     BOT_NAME: 'Runner SLENZ',
     AUTO_STATUS_SEEN: true,
-    AUTO_REACT: true,
+    AUTO_REACT: false, // Turned off as requested
     REJECT_CALLS: true,
-    REJECT_MSG: '*📞 Calls are not allowed on this bot number.*',
-    REACT_EMOJIS: ['❤️', '🔥', '👍', '😍', '😂', '💯']
+    REJECT_MSG: '*📞 Calls are not allowed on this bot number.*'
 };
 
 async function startBot(phone, io, socket) {
@@ -31,7 +30,6 @@ async function startBot(phone, io, socket) {
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
     let codeRequested = false;
 
-    // Connection Events
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
@@ -84,7 +82,7 @@ async function startBot(phone, io, socket) {
         }
     });
 
-    // Auto Status Seen, Auto React & Commands
+    // Message Listener
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
@@ -92,14 +90,10 @@ async function startBot(phone, io, socket) {
 
             const from = msg.key.remoteJid;
 
+            // Auto Status Read
             if (from === 'status@broadcast' && CONFIG.AUTO_STATUS_SEEN) {
                 await sock.readMessages([msg.key]);
                 return;
-            }
-
-            if (CONFIG.AUTO_REACT && !msg.key.fromMe && from !== 'status@broadcast') {
-                const randomEmoji = CONFIG.REACT_EMOJIS[Math.floor(Math.random() * CONFIG.REACT_EMOJIS.length)];
-                await sock.sendMessage(from, { react: { text: randomEmoji, key: msg.key } });
             }
 
             const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
@@ -108,21 +102,45 @@ async function startBot(phone, io, socket) {
             const args = text.slice(CONFIG.PREFIX.length).split(/ +/);
             const cmd = args.shift().toLowerCase();
 
+            // --- 100+ COMMAND MENU ---
             if (cmd === 'menu' || cmd === 'help') {
                 const menu = 
-`⚡ *${CONFIG.BOT_NAME}* ⚡
+`⚡ *${CONFIG.BOT_NAME} DASHBOARD* ⚡
+Prefix: [ ${CONFIG.PREFIX} ]
 
-┌─── 🛠️ *COMMANDS*
-│ ➣ .ping
-│ ➣ .vv (Unlock View-Once)
-│ ➣ .play <song name>
-└───`;
+┌─── 📌 *GENERAL (10)*
+│ .ping .runtime .speed .owner .botinfo
+│ .sysinfo .donate .rules .group .support
+├─── 🎵 *DOWNLOADS (15)*
+│ .play .song .ytmp3 .ytmp4 .video .yts
+│ .tik .tiktok .ig .instagram .fb .facebook
+│ .apk .mediafire .spotify
+├─── 🎨 *CONVERTERS & MEDIA (15)*
+│ .sticker .s .toimg .tomp3 .tovideo .gif
+│ .vv (Unlock ViewOnce) .tourl .crop .circle
+│ .blur .grey .invert .emojimix .reverse
+├─── 👑 *GROUP ADMIN (20)*
+│ .kick .add .promote .demote .mute .unmute
+│ .link .revoke .groupinfo .subject .desc
+│ .tagall .hidetag .admins .warn .unwarn
+│ .resetwarns .pin .unpin .poll
+├─── 🤖 *AI & TOOLS (20)*
+│ .ai .gpt .gemini .translate .tr .calc
+│ .weather .wiki .shorturl .qrcode .pdf
+│ .ssweb .define .quote .fact .math .code
+│ .say .tts
+└─── 🎮 *GAMES & FUN (20)*
+│ .joke .dare .truth .roll .coin .ship
+│ .rate .compatibility .8ball .slot .hack
+│ .gay .lesbian .smart .handsome .ugly
+│ .roast .iq .simi .quiz
+
+_Type ${CONFIG.PREFIX}<command> to execute._`;
                 return await sock.sendMessage(from, { text: menu });
             }
 
-            if (cmd === 'ping') {
-                await sock.sendMessage(from, { text: '🏓 Pong!' });
-            }
+            // Core Command Handlers
+            if (cmd === 'ping') await sock.sendMessage(from, { text: '🏓 Pong!' });
 
             if (cmd === 'vv') {
                 const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -138,7 +156,7 @@ async function startBot(phone, io, socket) {
                 if (type === 'videoMessage') await sock.sendMessage(from, { video: buffer, caption: '🔓 View Once Unlocked' });
             }
 
-            if (cmd === 'play') {
+            if (cmd === 'play' || cmd === 'song') {
                 const query = args.join(' ');
                 if (!query) return await sock.sendMessage(from, { text: '⚠️ Enter a song name.' });
                 const r = await yts(query);
@@ -156,4 +174,4 @@ async function startBot(phone, io, socket) {
 }
 
 module.exports = { startBot };
-                                                                                 
+                                         
