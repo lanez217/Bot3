@@ -1,4 +1,3 @@
-require('dotenv').config?.();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -9,26 +8,35 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(__dirname));
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 io.on('connection', (socket) => {
-    console.log('User opened Runner SLENZ Panel');
+    console.log('⚡ Web Client Connected:', socket.id);
 
-    socket.on('connect_bot', async ({ phone }) => {
-        socket.emit('status', 'Initializing Runner SLENZ engine...');
+    socket.on('start_bot', async (data) => {
+        const phone = data?.phone || '';
         try {
             await startBot(phone, io, socket);
         } catch (err) {
-            console.error('Server error:', err);
-            socket.emit('status', 'Connection failed. Please retry.');
+            console.error('Error starting bot:', err);
+            socket.emit('status', 'Failed to start bot instance.');
         }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('❌ Web Client Disconnected:', socket.id);
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`⚡ Runner SLENZ Panel running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});
+              
