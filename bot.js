@@ -3,6 +3,16 @@ const pino = require('pino');
 const yts = require('yt-search');
 const fs = require('fs');
 
+const CONFIG = {
+    PREFIX: '.',
+    BOT_NAME: 'Runner SLENZ',
+    AUTO_STATUS_SEEN: true,
+    AUTO_REACT: true,
+    REJECT_CALLS: true,
+    REJECT_MSG: '*📞 Calls are not allowed on this bot number.*',
+    REACT_EMOJIS: ['❤️', '🔥', '👍', '😍', '😂', '💯']
+};
+
 async function startBot(phone, io, socket) {
     const authFolder = 'auth_info_runner_slenz';
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
@@ -21,6 +31,7 @@ async function startBot(phone, io, socket) {
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
     let codeRequested = false;
 
+    // Connection Events
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
@@ -28,122 +39,116 @@ async function startBot(phone, io, socket) {
 
         if (!sock.authState.creds.registered && cleanPhone && !codeRequested && (qr || connection === 'connecting')) {
             codeRequested = true;
-            if (socket) socket.emit('status', 'Requesting Runner SLENZ pairing code...');
+            if (socket) socket.emit('status', 'Requesting pairing code...');
 
             try {
                 await new Promise(res => setTimeout(res, 3000));
                 const code = await sock.requestPairingCode(cleanPhone);
-                
-                console.log('\n========================================');
-                console.log(`⚡ RUNNER SLENZ PAIRING CODE: ${code}`);
-                console.log('========================================\n');
 
                 if (socket) {
                     socket.emit('pairing_code', code);
-                    socket.emit('status', 'Pairing Code Generated Successfully!');
+                    socket.emit('status', 'Pairing Code Generated!');
                 }
             } catch (err) {
-                console.error('Pairing Code Error:', err);
+                console.error('Pairing Error:', err);
                 codeRequested = false;
-                if (socket) socket.emit('status', 'Failed to generate code. Tap Connect again.');
+                if (socket) socket.emit('status', 'Failed to generate code. Retry.');
             }
         }
 
         if (connection === 'open') {
-            console.log('✅ RUNNER SLENZ BOT CONNECTED TO WHATSAPP!');
+            console.log('✅ BOT CONNECTED!');
             if (socket) {
                 socket.emit('connected');
                 socket.emit('status', 'Runner SLENZ is Online!');
             }
         } else if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
             if (socket) socket.emit('disconnected');
 
             if (statusCode === DisconnectReason.loggedOut) {
-                if (fs.existsSync(authFolder)) {
-                    fs.rmSync(authFolder, { recursive: true, force: true });
-                }
+                if (fs.existsSync(authFolder)) fs.rmSync(authFolder, { recursive: true, force: true });
             }
+            if (statusCode !== DisconnectReason.loggedOut) startBot(phone, io, socket);
+        }
+    });
 
-            if (shouldReconnect) {
-                startBot(phone, io, socket);
+    // Auto Call Reject
+    sock.ev.on('call', async (calls) => {
+        if (!CONFIG.REJECT_CALLS) return;
+        for (const call of calls) {
+            if (call.status === 'offer') {
+                await sock.rejectCall(call.id, call.from);
+                await sock.sendMessage(call.from, { text: CONFIG.REJECT_MSG });
             }
         }
     });
 
-    // --- COMMANDS ---
-    const commands = {
-        ping: async (s, f) => await s.sendMessage(f, { text: '🏓 *Pong!* Runner SLENZ Bot is running fast.' }),
-        status: async (s, f) => await s.sendMessage(f, { text: '🟢 *Runner SLENZ Status:* Active & Online' }),
-        uptime: async (s, f) => await s.sendMessage(f, { text: `⏱️ *Uptime:* ${Math.floor(process.uptime())}s` }),
-        owner: async (s, f) => await s.sendMessage(f, { text: '👑 *Bot Owner:* Lanez' }),
-
-        vv: async (s, f, msg) => {
-            const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            const viewOnceMedia = quoted?.viewOnceMessageV2?.message || quoted?.viewOnceMessage?.message;
-
-            if (!viewOnceMedia) return await s.sendMessage(f, { text: '⚠️ Reply to a View Once media with `.vv`' });
-
-            const mediaType = Object.keys(viewOnceMedia)[0];
-            const stream = await downloadContentFromMessage(viewOnceMedia[mediaType], mediaType.replace('Message', ''));
-
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-            if (mediaType === 'imageMessage') {
-                await s.sendMessage(f, { image: buffer, caption: '🔓 *View-Once Unlocked by Runner SLENZ*' });
-            } else if (mediaType === 'videoMessage') {
-                await s.sendMessage(f, { video: buffer, caption: '🔓 *View-Once Unlocked by Runner SLENZ*' });
-            }
-        },
-
-        play: async (s, f, msg, args) => {
-            const query = args.join(' ');
-            if (!query) return await s.sendMessage(f, { text: '⚠️ Provide a song name! Example: `.play song name`' });
-
-            await s.sendMessage(f, { text: `🔍 *Runner SLENZ Searching:* "${query}"...` });
-            const r = await yts(query);
-            const video = r.videos[0];
-
-            if (!video) return await s.sendMessage(f, { text: '❌ No results found.' });
-            await s.sendMessage(f, { image: { url: video.thumbnail }, caption: `🎵 *${video.title}*\n⏱️ ${video.timestamp}\n🔗 ${video.url}` });
-        }
-    };
-
+    // Auto Status Seen, Auto React & Commands
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
 
             const from = msg.key.remoteJid;
+
+            if (from === 'status@broadcast' && CONFIG.AUTO_STATUS_SEEN) {
+                await sock.readMessages([msg.key]);
+                return;
+            }
+
+            if (CONFIG.AUTO_REACT && !msg.key.fromMe && from !== 'status@broadcast') {
+                const randomEmoji = CONFIG.REACT_EMOJIS[Math.floor(Math.random() * CONFIG.REACT_EMOJIS.length)];
+                await sock.sendMessage(from, { react: { text: randomEmoji, key: msg.key } });
+            }
+
             const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
+            if (!text.startsWith(CONFIG.PREFIX)) return;
 
-            if (!text.startsWith('.')) return;
-
-            const args = text.slice(1).split(/ +/);
+            const args = text.slice(CONFIG.PREFIX.length).split(/ +/);
             const cmd = args.shift().toLowerCase();
 
             if (cmd === 'menu' || cmd === 'help') {
-                const menuText = 
-`⚡ *RUNNER SLENZ BOT* ⚡
-👑 *Owner:* Lanez
+                const menu = 
+`⚡ *${CONFIG.BOT_NAME}* ⚡
 
 ┌─── 🛠️ *COMMANDS*
 │ ➣ .ping
-│ ➣ .status
-│ ➣ .uptime
-│ ➣ .owner
-│ ➣ .vv (Reply to View Once)
+│ ➣ .vv (Unlock View-Once)
 │ ➣ .play <song name>
 └───`;
-                return await sock.sendMessage(from, { text: menuText });
+                return await sock.sendMessage(from, { text: menu });
             }
 
-            if (commands[cmd]) await commands[cmd](sock, from, msg, args);
+            if (cmd === 'ping') {
+                await sock.sendMessage(from, { text: '🏓 Pong!' });
+            }
+
+            if (cmd === 'vv') {
+                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                const viewOnce = quoted?.viewOnceMessageV2?.message || quoted?.viewOnceMessage?.message;
+                if (!viewOnce) return await sock.sendMessage(from, { text: '⚠️ Reply to a View Once media.' });
+
+                const type = Object.keys(viewOnce)[0];
+                const stream = await downloadContentFromMessage(viewOnce[type], type.replace('Message', ''));
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                if (type === 'imageMessage') await sock.sendMessage(from, { image: buffer, caption: '🔓 View Once Unlocked' });
+                if (type === 'videoMessage') await sock.sendMessage(from, { video: buffer, caption: '🔓 View Once Unlocked' });
+            }
+
+            if (cmd === 'play') {
+                const query = args.join(' ');
+                if (!query) return await sock.sendMessage(from, { text: '⚠️ Enter a song name.' });
+                const r = await yts(query);
+                const video = r.videos[0];
+                if (!video) return await sock.sendMessage(from, { text: '❌ Not found.' });
+                await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: `🎵 *${video.title}*\n⏱️ ${video.timestamp}\n🔗 ${video.url}` });
+            }
+
         } catch (err) {
-            console.error('Command Error:', err);
+            console.error('Message Error:', err);
         }
     });
 
@@ -151,3 +156,4 @@ async function startBot(phone, io, socket) {
 }
 
 module.exports = { startBot };
+                                                                                 
