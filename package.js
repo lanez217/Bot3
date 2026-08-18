@@ -1,7 +1,7 @@
 {
   "name": "runner-slenz-bot",
   "version": "1.0.0",
-  "description": "Runner SLENZ WhatsApp Bot & Panel",
+  "description": "Runner SLENZ WhatsApp Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "pino": "^9.0.0",
     "socket.io": "^4.7.5",
