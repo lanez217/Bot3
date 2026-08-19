@@ -3,75 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LANEZ BOT CONTROL PANEL</title>
+    <title>LANEZ OS Pro</title>
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0b0f19; --card: #151c2c; --primary: #00e676; --accent: #7c4dff; --text: #ffffff; --subtext: #94a3b8; }
-        body { font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 500px; background: var(--card); border-radius: 16px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h1 { margin: 0; font-size: 24px; color: var(--primary); letter-spacing: 1px; }
-        .header p { margin: 5px 0 0; color: var(--subtext); font-size: 13px; }
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(0,230,118,0.1); color: var(--primary); margin-top: 10px; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
-        .stat-card { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.02); }
-        .stat-card h3 { margin: 0; font-size: 18px; color: var(--accent); }
-        .stat-card span { font-size: 11px; color: var(--subtext); }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; color: var(--subtext); margin-bottom: 5px; }
-        input { width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; box-sizing: border-box; font-size: 14px; outline: none; }
-        input:focus { border-color: var(--primary); }
-        button { width: 100%; padding: 12px; background: linear-gradient(135deg, var(--primary), #00b0ff); border: none; border-radius: 8px; color: #000; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 14px; }
-        button:hover { opacity: 0.9; transform: translateY(-1px); }
-        .code-box { font-size: 28px; letter-spacing: 6px; font-weight: 700; color: var(--primary); text-align: center; margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; min-height: 40px; }
+        :root {
+            --bg: #05070d;
+            --card: #0c101a;
+            --card-2: #121927;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #64748b;
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.25);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+
+        body {
+            background: var(--bg);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 40%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 32px 16px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .header { display: flex; align-items: center; justify-content: space-between; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .logo {
+            width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), #0ea5e9);
+            border-radius: 12px; display: grid; place-items: center;
+            font-weight: 800; font-size: 18px; color: #000;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+        .brand h1 { font-size: 18px; font-weight: 700; }
+        .brand p { font-size: 12px; color: var(--text-muted); }
+
+        .status {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 12px; border-radius: 8px;
+            background: rgba(239, 68, 68, 0.1); color: var(--danger);
+            font-size: 12px; font-weight: 600;
+        }
+        .status.online { background: rgba(34, 197, 94, 0.1); color: var(--success); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .stat {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+            padding: 14px; border-radius: 12px;
+        }
+        .stat h3 { font-size: 20px; font-weight: 700; color: var(--primary); }
+        .stat p { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        .field label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+        .field input {
+            width: 100%; padding: 14px 16px; background: #080b12;
+            border: 1px solid var(--border); border-radius: 12px; color: var(--text);
+            font-size: 14px; outline: none; transition: all 0.2s;
+        }
+        .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+        .btn {
+            width: 100%; padding: 15px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), #0ea5e9);
+            color: #000; font-size: 15px; font-weight: 700; cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--primary-glow); }
+        .btn:active { transform: translateY(0); }
+
+        .pair-box {
+            background: #080b12; border: 1px dashed var(--primary);
+            border-radius: 14px; padding: 20px; text-align: center;
+            position: relative;
+        }
+        .pair-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        .pair-code {
+            font-size: 32px; font-weight: 800; color: var(--primary);
+            font-family: 'Courier New', monospace; letter-spacing: 8px; margin: 8px 0;
+        }
+        .copy-btn {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(56,189,248,0.1); border: 1px solid var(--primary);
+            color: var(--primary); padding: 6px 10px; border-radius: 8px;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+        }
+
+        .sessions h4 { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; }
+        .session-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 12px; background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .session-status { display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 12px; }
+
+        .terminal {
+            background: #000; border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px; font-family: 'Courier New', monospace; font-size: 11px;
+            color: #4ade80; max-height: 120px; overflow-y: auto;
+        }
+
+        footer { text-align: center; font-size: 12px; color: var(--text-muted); padding-top: 10px; }
+        footer strong { color: var(--primary); }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <div class="header">
-            <h1>⚡ LANEZ BOT OS ⚡</h1>
-            <p>Runner SLENZ Control Dashboard</p>
-            <div id="status" class="badge">Status: Offline</div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3 id="cmd-count">500+</h3>
-                <span>Loaded Commands</span>
+        <div class="card">
+            <div class="header">
+                <div class="brand">
+                    <div class="logo">L</div>
+                    <div>
+                        <h1>LANEZ OS Pro</h1>
+                        <p>Runner SLENZ Engine</p>
+                    </div>
+                </div>
+                <div class="status" id="status">
+                    <span class="dot"></span>
+                    <span id="status-text">Offline</span>
+                </div>
             </div>
-            <div class="stat-card">
-                <h3 id="uptime">0s</h3>
-                <span>Server Uptime</span>
+        </div>
+
+        <div class="card stats">
+            <div class="stat"><h3 id="cmds">500+</h3><p>Commands</p></div>
+            <div class="stat"><h3 id="sessions">0</h3><p>Sessions</p></div>
+            <div class="stat"><h3 id="uptime">0s</h3><p>Uptime</p></div>
+        </div>
+
+        <div class="card">
+            <div class="field">
+                <label>Target Phone Number</label>
+                <input type="text" id="phone" placeholder="233XXXXXXXXX">
+            </div>
+            <button class="btn" onclick="requestPair()">Generate Pairing Code</button>
+
+            <div class="pair-box" style="margin-top: 20px;">
+                <button class="copy-btn" onclick="copyCode()">Copy</button>
+                <div class="pair-label">Pairing Code</div>
+                <div class="pair-code" id="pair-code">------</div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label>WhatsApp Phone Number (with Country Code)</label>
-            <input type="text" id="phone" placeholder="e.g. 233xxxxxxxx">
+        <div class="card sessions">
+            <h4>Active Sessions</h4>
+            <div id="session-list">
+                <div class="session-item"><span>No active sessions</span></div>
+            </div>
         </div>
-        <button onclick="requestPairing()">Link New Device</button>
 
-        <div class="code-box" id="pairing-code">------</div>
+        <div class="card">
+            <h4 style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase;">System Log</h4>
+            <div class="terminal" id="log">[INIT] LANEZ OS Pro v3.0 Booted</div>
+        </div>
+
+        <footer>
+            © 2026 <strong>LANEZ</strong>. Professional WhatsApp Control Interface.
+        </footer>
     </div>
 
     <script>
         const socket = io();
-        socket.on('status', (msg) => document.getElementById('status').innerText = msg);
-        socket.on('pairing_code', (code) => document.getElementById('pairing-code').innerText = code);
-        socket.on('connected', () => document.getElementById('status').innerText = 'Connected & Active');
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
 
-        function requestPairing() {
-            const phone = document.getElementById('phone').value;
-            if(!phone) return alert('Please enter your phone number!');
+        function addLog(msg) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `<br>[${time}] ${msg}`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        socket.on('status', (msg) => {
+            document.getElementById('status-text').innerText = msg;
+            status.className = msg.toLowerCase().includes('online') ? 'status online' : 'status';
+            addLog(`STATUS: ${msg}`);
+        });
+
+        socket.on('pairing_code', (code) => {
+            document.getElementById('pair-code').innerText = code;
+            addLog(`Pairing code generated: ${code}`);
+        });
+
+        socket.on('sessions_update', (sessions) => {
+            document.getElementById('sessions').innerText = sessions.length;
+            const list = document.getElementById('session-list');
+            if(sessions.length === 0) {
+                list.innerHTML = `<div class="session-item"><span>No active sessions</span></div>`;
+            } else {
+                list.innerHTML = sessions.map(s => `
+                    <div class="session-item">
+                        <span>${s.phone}</span>
+                        <div class="session-status"><span class="dot"></span>Online</div>
+                    </div>
+                `).join('');
+            }
+        });
+
+        function requestPair() {
+            const phone = document.getElementById('phone').value.trim();
+            if(!phone) return alert('Enter phone number with country code');
+            document.getElementById('pair-code').innerText = '......';
+            addLog(`Requesting pairing for ${phone}`);
             socket.emit('start_bot', { phone });
         }
 
+        function copyCode() {
+            const code = document.getElementById('pair-code').innerText;
+            navigator.clipboard.writeText(code);
+            addLog('Pairing code copied to clipboard');
+        }
+
+        let seconds = 0;
         setInterval(() => {
-            const uptime = document.getElementById('uptime');
-            let secs = parseInt(uptime.getAttribute('data-sec') || 0) + 1;
-            uptime.setAttribute('data-sec', secs);
-            uptime.innerText = secs + 's';
+            seconds++;
+            let h = Math.floor(seconds/3600);
+            let m = Math.floor((seconds%3600)/60);
+            let s = seconds%60;
+            document.getElementById('uptime').innerText = `${h}h ${m}m ${s}s`;
         }, 1000);
     </script>
 </body>
