@@ -8,35 +8,44 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Store active bot session instances
+const activeSessions = new Map();
 
 io.on('connection', (socket) => {
-    console.log('⚡ Web Client Connected:', socket.id);
+    console.log('⚡ Dashboard Connected:', socket.id);
+
+    // Send current active sessions immediately on connection
+    const currentSessions = Array.from(activeSessions.keys()).map(phone => ({ phone }));
+    socket.emit('sessions_update', currentSessions);
 
     socket.on('start_bot', async (data) => {
-        const phone = data?.phone || '';
+        const { phone } = data;
+        if (!phone) return;
+
+        socket.emit('status', 'Initializing Engine...');
+
         try {
-            await startBot(phone, io, socket);
+            const botInstance = await startBot(phone, io, socket);
+            activeSessions.set(phone, botInstance);
+
+            // Broadcast updated active session list to dashboard
+            const updatedSessions = Array.from(activeSessions.keys()).map(p => ({ phone: p }));
+            io.emit('sessions_update', updatedSessions);
+
         } catch (err) {
-            console.error('Error starting bot:', err);
-            socket.emit('status', 'Failed to start bot instance.');
+            console.error('Bot Startup Error:', err);
+            socket.emit('status', 'Error launching bot');
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Web Client Disconnected:', socket.id);
+        console.log('❌ Dashboard Disconnected:', socket.id);
     });
 });
 
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 LANEZ OS Pro Server running on port ${PORT}`);
 });
-              
