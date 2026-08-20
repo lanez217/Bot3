@@ -1,19 +1,17 @@
 {
-  "name": "runner-slenz-bot",
+  "name": "lanez-whatsapp-bot",
   "version": "1.0.0",
-  "description": "Runner SLENZ WhatsApp Bot",
+  "description": "LANEZ OS Pro WhatsApp Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
     "express": "^4.19.2",
-    "pino": "^9.0.0",
+    "pino": "^9.3.2",
     "socket.io": "^4.7.5",
-    "yt-search": "^2.11.1"
+    "yt-search": "^2.11.1",
+    "@distube/ytdl-core": "^4.15.8"
   }
 }
