@@ -1,13 +1,9 @@
 const yts = require('yt-search');
-const ytdl = require('ytdl-core');
+const ytdl = require('@distube/ytdl-core');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
-const CONFIG = {
-    OWNER_NUMBER: '233597789459@s.whatsapp.net'
-};
-
 const COMMANDS = [
-    // --- 1. GENERAL & SYSTEM ---
+    // --- 1. SYSTEM COMMANDS ---
     {
         name: 'ping',
         cat: 'SYSTEM',
@@ -34,18 +30,17 @@ const COMMANDS = [
         name: 'play',
         cat: 'MEDIA',
         desc: 'Search and download YouTube Audio',
-        exec: async ({ sock, from, args }) => {
+        exec: async ({ sock, from, args, msg }) => {
             const query = args.join(' ');
             if (!query) return await sock.sendMessage(from, { text: '⚠️ Please provide a song name.' });
 
-            await sock.sendMessage(from, { text: `🔎 Searching for *${query}*...` });
+            await sock.sendMessage(from, { text: `🔎 Searching audio for *${query}*...` });
             const search = await yts(query);
             const video = search.videos[0];
             if (!video) return await sock.sendMessage(from, { text: '❌ No results found on YouTube.' });
 
-            await sock.sendMessage(from, { text: `📥 Downloading: *${video.title}*...` });
-            
-            // Audio Stream Download
+            await sock.sendMessage(from, { text: `📥 Downloading Audio: *${video.title}*...` });
+
             const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' });
             let buffer = Buffer.from([]);
             for await (const chunk of stream) {
@@ -127,7 +122,7 @@ const COMMANDS = [
         exec: async ({ sock, from, mentioned }) => {
             if (!mentioned[0]) return await sock.sendMessage(from, { text: '⚠️ Mention a user to kick.' });
             await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
-            await sock.sendMessage(from, { text: '✅ User removed.' });
+            await sock.sendMessage(from, { text: '✅ Member removed.' });
         }
     },
     {
@@ -185,4 +180,4 @@ const COMMANDS = [
 ];
 
 module.exports = COMMANDS;
-                                                                
+                
