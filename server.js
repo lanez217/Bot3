@@ -10,21 +10,18 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware & Static Files
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Basic Dashboard Route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Socket.io Realtime Dashboard Connection
+// Socket connection for dashboard controls
 io.on('connection', (socket) => {
     console.log(`⚡ Dashboard Connected: ${socket.id}`);
 
-    // Trigger Bot Startup via Dashboard/Socket Event
     socket.on('start_bot', async () => {
         try {
             console.log('🚀 Invoking startBot() via Socket request...');
@@ -40,9 +37,9 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start Web Server & Automatically Initialize WhatsApp Bot
+// Start Express server and initialize WhatsApp connection
 server.listen(PORT, async () => {
-    console.log(`🌐 Server running on port http://localhost:${PORT}`);
+    console.log(`🌐 Server running on http://localhost:${PORT}`);
     try {
         await startBot(io);
     } catch (err) {
