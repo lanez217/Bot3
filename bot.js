@@ -1,21 +1,35 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const COMMANDS = require('./commands'); // Imports your commands array
+const COMMANDS = require('./commands');
 
-async function startBot(io) {
+async function startBot(io, phoneNumber = null) {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_lanez');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
+        printQRInTerminal: false, // Cleaned up deprecated warning
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    // QR Code & Connection Status updates to Socket.io Dashboard
+    // Request Pairing Code if user provided a phone number and isn't registered yet
+    if (phoneNumber && !sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                const cleanNum = phoneNumber.replace(/[^0-9]/g, '');
+                const code = await sock.requestPairingCode(cleanNum);
+                console.log(`🔑 Pairing Code generated: ${code}`);
+                if (io) io.emit('pairing_code', code);
+            } catch (err) {
+                console.error('Error generating pairing code:', err);
+                if (io) io.emit('pairing_error', 'Failed to generate code. Try again.');
+            }
+        }, 3000); // Wait 3 seconds for socket connection to initialize
+    }
+
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        if (qr && io) {
+        if (qr && io && !phoneNumber) {
             io.emit('qr', qr);
         }
 
@@ -30,7 +44,6 @@ async function startBot(io) {
         }
     });
 
-    // Message Handler
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -52,8 +65,10 @@ async function startBot(io) {
 
         let participants = [];
         if (isGroup) {
-            const groupMetadata = await sock.groupMetadata(from);
-            participants = groupMetadata.participants;
+            try {
+                const groupMetadata = await sock.groupMetadata(from);
+                participants = groupMetadata.participants;
+            } catch (e) {}
         }
 
         const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
@@ -67,6 +82,5 @@ async function startBot(io) {
     });
 }
 
-// EXPORT THE FUNCTION PROPERLY
 module.exports = { startBot };
-               
+            
