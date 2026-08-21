@@ -1,187 +1,111 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const fs = require('fs');
-const https = require('https');
+const COMMANDS = require('./commands'); // External command array
 
-const COMMANDS = require('./commands');
+const OWNER_NUM = '233597789459';
 
-const CONFIG = {
-    PREFIX: '.',
-    BOT_NAME: 'LANEZ OS Pro',
-    OWNER_NUMBER: '233597789459',
-    RENDER_URL: 'https://bot3-xyz.onrender.com', // Update with your Render URL
-    AUTO_STATUS_SEEN: true,
-    REJECT_CALLS: true,
-    REJECT_MSG: '*📞 Calls are prohibited on LANEZ Bot.*'
-};
-
-function startKeepAlive() {
-    setInterval(() => {
-        if (CONFIG.RENDER_URL && CONFIG.RENDER_URL.startsWith('http')) {
-            https.get(CONFIG.RENDER_URL, (res) => {
-                console.log(`[KEEP-ALIVE] Ping status: ${res.statusCode}`);
-            }).on('error', () => {});
-        }
-    }, 10 * 60 * 1000);
-}
-
-function generateMenu() {
-    let menu = `⚡ *${CONFIG.BOT_NAME}* ⚡\n`;
-    menu += `👑 *Owner:* +${CONFIG.OWNER_NUMBER}\n`;
-    menu += `📌 *Prefix:* [ ${CONFIG.PREFIX} ]\n`;
-    menu += `📊 *Total Commands:* ${COMMANDS.length}\n\n`;
-
-    const categories = [...new Set(COMMANDS.map(c => c.cat || 'GENERAL'))];
-
-    categories.forEach(cat => {
-        menu += `┌─── 🚀 *${cat}*\n`;
-        const categoryCmds = COMMANDS.filter(c => (c.cat || 'GENERAL') === cat);
-        categoryCmds.forEach(cmd => {
-            menu += `│ ➣ ${CONFIG.PREFIX}${cmd.name} ${cmd.ownerOnly ? '👑' : ''}\n`;
-        });
-        menu += `└───\n\n`;
-    });
-
-    return menu;
-}
-
-async function startBot(phone, io, socket) {
-    const authFolder = 'auth_info_lanez';
-    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_lanez');
 
     const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu('Chrome'),
-        connectTimeoutMs: 60000,
-        keepAliveIntervalMs: 15000
+        printQRInTerminal: true,
+        auth: state,
+        browser: ['LANEZ OS', 'Chrome', '1.0.0']
     });
 
     sock.ev.on('creds.update', saveCreds);
-    startKeepAlive();
 
-    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
-    let codeRequested = false;
-
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr && socket) socket.emit('qr', qr);
-
-        if (!sock.authState.creds.registered && cleanPhone && !codeRequested && (qr || connection === 'connecting')) {
-            codeRequested = true;
-            if (socket) socket.emit('status', 'Generating Pairing Code...');
-
-            try {
-                await new Promise(res => setTimeout(res, 3000));
-                const code = await sock.requestPairingCode(cleanPhone);
-                if (socket) {
-                    socket.emit('pairing_code', code);
-                    socket.emit('status', 'Pairing Code Active!');
-                }
-            } catch (err) {
-                codeRequested = false;
-                if (socket) socket.emit('status', 'Failed to generate code.');
-            }
-        }
-
-        if (connection === 'open') {
-            console.log('✅ LANEZ BOT ONLINE');
-            if (socket) {
-                socket.emit('connected');
-                socket.emit('status', 'LANEZ OS Pro Online');
-            }
-        } else if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            if (statusCode === DisconnectReason.loggedOut) {
-                if (fs.existsSync(authFolder)) fs.rmSync(authFolder, { recursive: true, force: true });
-            }
-            if (statusCode !== DisconnectReason.loggedOut) startBot(phone, io, socket);
-        }
-    });
-
-    sock.ev.on('call', async (calls) => {
-        if (!CONFIG.REJECT_CALLS) return;
-        for (const call of calls) {
-            if (call.status === 'offer') {
-                await sock.rejectCall(call.id, call.from);
-                await sock.sendMessage(call.from, { text: CONFIG.REJECT_MSG });
-            }
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('Connection closed. Reconnecting:', shouldReconnect);
+            if (shouldReconnect) startBot();
+        } else if (connection === 'open') {
+            console.log('🟢 LANEZ OS Connected successfully!');
         }
     });
 
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
-            if (!msg || !msg.message) return;
+            if (!msg || !msg.message || msg.key.fromMe) return;
 
             const from = msg.key.remoteJid;
+
+            // 1. EXTRACT SENDER (Required for Owner Commands)
+            const sender = msg.key.participant || msg.key.remoteJid;
+            const cleanSender = sender.replace(/[^0-9]/g, '');
+            const isOwner = cleanSender === OWNER_NUM;
+
+            // 2. EXTRACT TEXT CONTENT
+            const body = msg.message.conversation || 
+                         msg.message.extendedTextMessage?.text || 
+                         msg.message.imageMessage?.caption || 
+                         msg.message.videoMessage?.caption || '';
+
+            const prefix = '.';
+            if (!body.startsWith(prefix)) return;
+
+            const args = body.slice(prefix.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
+
+            // 3. FETCH GROUP METADATA
             const isGroup = from.endsWith('@g.us');
-            const senderRaw = msg.key.participant || msg.key.remoteJid;
-            const senderNum = senderRaw.replace(/[^0-9]/g, '');
-
-            if (from === 'status@broadcast' && CONFIG.AUTO_STATUS_SEEN) {
-                await sock.readMessages([msg.key]);
-                return;
-            }
-
-            const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '').trim();
-            if (!text.startsWith(CONFIG.PREFIX)) return;
-
-            const args = text.slice(CONFIG.PREFIX.length).split(/ +/);
-            const cmdName = args.shift().toLowerCase();
-
-            if (cmdName === 'menu' || cmdName === 'help') {
-                return await sock.sendMessage(from, { text: generateMenu() });
-            }
-
-            const cmd = COMMANDS.find(c => c.name === cmdName);
-            if (!cmd) return;
-
-            // Strict Owner Validation
-            const isOwner = senderNum === CONFIG.OWNER_NUMBER;
-            if (cmd.ownerOnly && !isOwner) {
-                return await sock.sendMessage(from, { text: '❌ Access Denied: Owner Only Command!' });
-            }
-
-            // Group Metadata & Admin Validation
             let participants = [];
-            let isBotAdmin = false;
-            let isAdmin = false;
-
             if (isGroup) {
-                const groupMetadata = await sock.groupMetadata(from);
-                participants = groupMetadata.participants || [];
-                const botJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-                
-                const botP = participants.find(p => p.id.includes(sock.user.id.split(':')[0]));
-                isBotAdmin = botP?.admin === 'admin' || botP?.admin === 'superadmin';
-
-                const senderP = participants.find(p => p.id.includes(senderNum));
-                isAdmin = senderP?.admin === 'admin' || senderP?.admin === 'superadmin' || isOwner;
-            }
-
-            if (cmd.group && !isGroup) {
-                return await sock.sendMessage(from, { text: '⚠️ Command can only be used in group chats.' });
-            }
-
-            if (cmd.adminOnly && !isAdmin) {
-                return await sock.sendMessage(from, { text: '⚠️ You must be a Group Admin to use this command.' });
+                try {
+                    const groupMetadata = await sock.groupMetadata(from);
+                    participants = groupMetadata.participants || [];
+                } catch (e) {
+                    console.error('Failed to fetch group metadata:', e);
+                }
             }
 
             const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
-            // Execute logic
-            await cmd.exec({ sock, from, msg, args, isGroup, sender: senderNum, isOwner, isAdmin, isBotAdmin, participants, mentioned });
+            // =========================================================
+            // INLINE COMMANDS (Commands built directly into bot.js)
+            // =========================================================
+            switch (commandName) {
+                case 'hi':
+                case 'hello':
+                    await sock.sendMessage(from, { text: ' 👋 Hello! LANEZ OS is active.' });
+                    return;
+
+                case 'ownercheck':
+                    if (!isOwner) {
+                        await sock.sendMessage(from, { text: '❌ Access Denied: Owner only.' });
+                        return;
+                    }
+                    await sock.sendMessage(from, { text: `👑 Welcome Owner! ID: ${cleanSender}` });
+                    return;
+
+                // Add any other inline commands from your old bot.js here
+            }
+
+            // =========================================================
+            // EXTERNAL COMMANDS (Loaded from commands.js)
+            // Handles .play, .video, .imgsearch, owner commands, etc.
+            // =========================================================
+            const cmd = COMMANDS.find(c => c.name === commandName);
+            if (cmd) {
+                await cmd.exec({
+                    sock,
+                    from,
+                    args,
+                    msg,
+                    sender, // Pass full sender ID for checkIsOwner inside commands.js
+                    mentioned,
+                    participants
+                });
+            }
 
         } catch (err) {
-            console.error('Routing Error:', err);
+            console.error('Error in message handler:', err);
         }
     });
-
-    return sock;
 }
 
-module.exports = { startBot };
-        
+startBot();
