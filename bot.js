@@ -3,38 +3,33 @@ const pino = require('pino');
 const fs = require('fs');
 const https = require('https');
 
-// IMPORT COMMANDS REGISTRY
 const COMMANDS = require('./commands');
 
 const CONFIG = {
     PREFIX: '.',
     BOT_NAME: 'LANEZ OS Pro',
     OWNER_NUMBER: '233597789459',
-    RENDER_URL: 'https://your-app-name.onrender.com', // Replace with your exact Render URL
+    RENDER_URL: 'https://bot3-xyz.onrender.com', // Update with your Render URL
     AUTO_STATUS_SEEN: true,
     REJECT_CALLS: true,
     REJECT_MSG: '*📞 Calls are prohibited on LANEZ Bot.*'
 };
 
-// PREVENT RENDER FROM SLEEPING (KEEP-ALIVE)
 function startKeepAlive() {
     setInterval(() => {
         if (CONFIG.RENDER_URL && CONFIG.RENDER_URL.startsWith('http')) {
             https.get(CONFIG.RENDER_URL, (res) => {
                 console.log(`[KEEP-ALIVE] Ping status: ${res.statusCode}`);
-            }).on('error', (err) => {
-                console.error('[KEEP-ALIVE] Ping failed:', err.message);
-            });
+            }).on('error', () => {});
         }
-    }, 10 * 60 * 1000); // Pings every 10 minutes
+    }, 10 * 60 * 1000);
 }
 
-// DYNAMIC MENU BUILDER
 function generateMenu() {
     let menu = `⚡ *${CONFIG.BOT_NAME}* ⚡\n`;
     menu += `👑 *Owner:* +${CONFIG.OWNER_NUMBER}\n`;
     menu += `📌 *Prefix:* [ ${CONFIG.PREFIX} ]\n`;
-    menu += `📊 *Commands Loaded:* ${COMMANDS.length}\n\n`;
+    menu += `📊 *Total Commands:* ${COMMANDS.length}\n\n`;
 
     const categories = [...new Set(COMMANDS.map(c => c.cat || 'GENERAL'))];
 
@@ -42,7 +37,7 @@ function generateMenu() {
         menu += `┌─── 🚀 *${cat}*\n`;
         const categoryCmds = COMMANDS.filter(c => (c.cat || 'GENERAL') === cat);
         categoryCmds.forEach(cmd => {
-            menu += `│ ➣ ${CONFIG.PREFIX}${cmd.name} ${cmd.ownerOnly ? '👑' : ''}- ${cmd.desc || ''}\n`;
+            menu += `│ ➣ ${CONFIG.PREFIX}${cmd.name} ${cmd.ownerOnly ? '👑' : ''}\n`;
         });
         menu += `└───\n\n`;
     });
@@ -50,7 +45,6 @@ function generateMenu() {
     return menu;
 }
 
-// MAIN BOT ENGINE
 async function startBot(phone, io, socket) {
     const authFolder = 'auth_info_lanez';
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
@@ -82,15 +76,13 @@ async function startBot(phone, io, socket) {
             try {
                 await new Promise(res => setTimeout(res, 3000));
                 const code = await sock.requestPairingCode(cleanPhone);
-
                 if (socket) {
                     socket.emit('pairing_code', code);
                     socket.emit('status', 'Pairing Code Active!');
                 }
             } catch (err) {
-                console.error('Pairing Error:', err);
                 codeRequested = false;
-                if (socket) socket.emit('status', 'Failed to generate pairing code.');
+                if (socket) socket.emit('status', 'Failed to generate code.');
             }
         }
 
@@ -102,8 +94,6 @@ async function startBot(phone, io, socket) {
             }
         } else if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            if (socket) socket.emit('status', 'Disconnected');
-
             if (statusCode === DisconnectReason.loggedOut) {
                 if (fs.existsSync(authFolder)) fs.rmSync(authFolder, { recursive: true, force: true });
             }
@@ -111,7 +101,6 @@ async function startBot(phone, io, socket) {
         }
     });
 
-    // AUTO REJECT CALLS
     sock.ev.on('call', async (calls) => {
         if (!CONFIG.REJECT_CALLS) return;
         for (const call of calls) {
@@ -122,7 +111,6 @@ async function startBot(phone, io, socket) {
         }
     });
 
-    // MESSAGE ROUTER & EXECUTOR
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
@@ -130,52 +118,65 @@ async function startBot(phone, io, socket) {
 
             const from = msg.key.remoteJid;
             const isGroup = from.endsWith('@g.us');
-            const sender = msg.key.participant || msg.key.remoteJid;
+            const senderRaw = msg.key.participant || msg.key.remoteJid;
+            const senderNum = senderRaw.replace(/[^0-9]/g, '');
 
-            // Auto Status View
             if (from === 'status@broadcast' && CONFIG.AUTO_STATUS_SEEN) {
                 await sock.readMessages([msg.key]);
                 return;
             }
 
-            const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
+            const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '').trim();
             if (!text.startsWith(CONFIG.PREFIX)) return;
 
             const args = text.slice(CONFIG.PREFIX.length).split(/ +/);
             const cmdName = args.shift().toLowerCase();
 
-            // Menu Display
             if (cmdName === 'menu' || cmdName === 'help') {
                 return await sock.sendMessage(from, { text: generateMenu() });
             }
 
-            // Find matching command from commands.js
             const cmd = COMMANDS.find(c => c.name === cmdName);
             if (!cmd) return;
 
-            // Owner Only Verification
-            if (cmd.ownerOnly && !sender.includes(CONFIG.OWNER_NUMBER)) {
-                return await sock.sendMessage(from, { text: '❌ This command is restricted to the Bot Owner.' });
+            // Strict Owner Validation
+            const isOwner = senderNum === CONFIG.OWNER_NUMBER;
+            if (cmd.ownerOnly && !isOwner) {
+                return await sock.sendMessage(from, { text: '❌ Access Denied: Owner Only Command!' });
             }
 
-            // Group Enforcement
-            if (cmd.group && !isGroup) {
-                return await sock.sendMessage(from, { text: '⚠️ This command can only be used in group chats.' });
-            }
-
+            // Group Metadata & Admin Validation
             let participants = [];
+            let isBotAdmin = false;
+            let isAdmin = false;
+
             if (isGroup) {
                 const groupMetadata = await sock.groupMetadata(from);
-                participants = groupMetadata.participants;
+                participants = groupMetadata.participants || [];
+                const botJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+                
+                const botP = participants.find(p => p.id.includes(sock.user.id.split(':')[0]));
+                isBotAdmin = botP?.admin === 'admin' || botP?.admin === 'superadmin';
+
+                const senderP = participants.find(p => p.id.includes(senderNum));
+                isAdmin = senderP?.admin === 'admin' || senderP?.admin === 'superadmin' || isOwner;
+            }
+
+            if (cmd.group && !isGroup) {
+                return await sock.sendMessage(from, { text: '⚠️ Command can only be used in group chats.' });
+            }
+
+            if (cmd.adminOnly && !isAdmin) {
+                return await sock.sendMessage(from, { text: '⚠️ You must be a Group Admin to use this command.' });
             }
 
             const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
-            // Run execution logic
-            await cmd.exec({ sock, from, msg, args, isGroup, sender, participants, mentioned });
+            // Execute logic
+            await cmd.exec({ sock, from, msg, args, isGroup, sender: senderNum, isOwner, isAdmin, isBotAdmin, participants, mentioned });
 
         } catch (err) {
-            console.error('Execution Error:', err);
+            console.error('Routing Error:', err);
         }
     });
 
@@ -183,3 +184,4 @@ async function startBot(phone, io, socket) {
 }
 
 module.exports = { startBot };
+        
