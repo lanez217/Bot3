@@ -8,44 +8,44 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const PORT = process.env.PORT || 3000;
+
+// Middleware & Static Files
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Store active bot session instances
-const activeSessions = new Map();
+// Basic Dashboard Route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
+// Socket.io Realtime Dashboard Connection
 io.on('connection', (socket) => {
-    console.log('⚡ Dashboard Connected:', socket.id);
+    console.log(`⚡ Dashboard Connected: ${socket.id}`);
 
-    // Send current active sessions immediately on connection
-    const currentSessions = Array.from(activeSessions.keys()).map(phone => ({ phone }));
-    socket.emit('sessions_update', currentSessions);
-
-    socket.on('start_bot', async (data) => {
-        const { phone } = data;
-        if (!phone) return;
-
-        socket.emit('status', 'Initializing Engine...');
-
+    // Trigger Bot Startup via Dashboard/Socket Event
+    socket.on('start_bot', async () => {
         try {
-            const botInstance = await startBot(phone, io, socket);
-            activeSessions.set(phone, botInstance);
-
-            // Broadcast updated active session list to dashboard
-            const updatedSessions = Array.from(activeSessions.keys()).map(p => ({ phone: p }));
-            io.emit('sessions_update', updatedSessions);
-
+            console.log('🚀 Invoking startBot() via Socket request...');
+            await startBot(io);
         } catch (err) {
             console.error('Bot Startup Error:', err);
-            socket.emit('status', 'Error launching bot');
+            socket.emit('bot_error', err.message);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Dashboard Disconnected:', socket.id);
+        console.log(`❌ Dashboard Disconnected: ${socket.id}`);
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 LANEZ OS Pro Server running on port ${PORT}`);
+// Start Web Server & Automatically Initialize WhatsApp Bot
+server.listen(PORT, async () => {
+    console.log(`🌐 Server running on port http://localhost:${PORT}`);
+    try {
+        await startBot(io);
+    } catch (err) {
+        console.error('Bot Startup Error:', err);
+    }
 });
