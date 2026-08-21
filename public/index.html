@@ -1,265 +1,168 @@
-<!DOCTYPE html>
+2<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LANEZ OS - WhatsApp Bot Dashboard</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .dashboard-card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 420px;
-            padding: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .stat-box {
-            background: #21262d;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #58a6ff;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: #8b949e;
-        }
-
-        .form-section {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #8b949e;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 12px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #ffffff;
-            font-size: 1rem;
-            outline: none;
-        }
-
-        .input-group input:focus {
-            border-color: #58a6ff;
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 12px;
-            background: #1f6feb;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-
-        .btn-submit:hover {
-            background: #388bfd;
-        }
-
-        .code-box {
-            border: 2px dashed #30363d;
-            border-radius: 8px;
-            padding: 16px;
-            text-align: center;
-            background: #0d1117;
-            margin-top: 16px;
-            position: relative;
-        }
-
-        .code-display {
-            font-family: monospace;
-            font-size: 1.5rem;
-            letter-spacing: 4px;
-            color: #58a6ff;
-            min-height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-copy {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            background: rgba(238, 75, 43, 0.2);
-            color: #ff7b72;
-            margin-top: 16px;
-            text-align: center;
-            width: 100%;
-        }
-
-        .status-badge.connected {
-            background: rgba(46, 160, 67, 0.2);
-            color: #3fb950;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LANEZ OS - WhatsApp Pairing</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #0f0c29);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+    }
+    @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    .glass {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+    .glow {
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    @keyframes glow {
+        from { box-shadow: 0 0 10px #8b5cf6, 0 0 20px #8b5cf6; }
+        to { box-shadow: 0 0 20px #ec4899, 0 0 30px #ec4899; }
+    }
+    .fade-in {
+        animation: fadeIn 0.8s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .btn {
+        transition: all 0.3s ease;
+    }
+    .btn:hover {
+        transform: translateY(-3px) scale(1.03);
+    }
+</style>
 </head>
-<body>
+<body class="text-white min-h-screen flex flex-col justify-between">
 
-    <div class="dashboard-card">
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-value">500+</div>
-                <div class="stat-label">Commands</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value" id="session-count">0</div>
-                <div class="stat-label">Sessions</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value" id="uptime-display">0m</div>
-                <div class="stat-label">Uptime</div>
+<!-- NAV -->
+<nav class="glass w-full p-4 fixed top-0 z-50 fade-in">
+    <h1 class="text-2xl font-bold text-center">⚡ LANEZ OS <span class="text-purple-400">Pairing</span></h1>
+</nav>
+
+<!-- MAIN -->
+<main class="flex-1 flex items-center justify-center p-6 mt-20">
+    <div class="glass rounded-3xl p-8 max-w-md w-full text-center fade-in glow">
+        
+        <h2 class="text-3xl font-bold mb-2">Connect WhatsApp</h2>
+        <p class="text-gray-300 mb-6">Enter your phone number to get a pairing code</p>
+
+        <!-- CODE SECTION -->
+        <div id="codeSection">
+            <input id="phone" type="text" placeholder="e.g. 233XXXXXXXXX" value="233597789459"
+                class="w-full bg-black/40 border border-purple-500 rounded-xl p-3 mb-4 text-center text-lg font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-purple-500">
+            
+            <button id="btn-get-code" onclick="getCode()" class="btn w-full bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-xl font-bold text-lg shadow-lg">
+                Get Pairing Code
+            </button>
+
+            <div id="codeBox" class="mt-6 p-4 bg-black/40 border border-purple-500/50 rounded-2xl hidden">
+                <p class="text-gray-400 text-sm mb-1">Your Pairing Code:</p>
+                
+                <div class="flex items-center justify-center gap-3 my-2">
+                    <h3 id="code" class="text-3xl font-extrabold tracking-widest text-purple-400 font-mono">────-────</h3>
+                    <button id="copyBtn" onclick="copyCode()" class="bg-purple-600/80 hover:bg-purple-600 text-xs px-3 py-2 rounded-lg font-semibold transition">
+                        Copy
+                    </button>
+                </div>
+
+                <p class="text-xs text-gray-400 mt-2">
+                    Open WhatsApp > Linked Devices > Link with phone number instead.
+                </p>
             </div>
         </div>
 
-        <div class="form-section">
-            <div class="input-group">
-                <label for="phone">TARGET PHONE NUMBER</label>
-                <input type="text" id="phone" placeholder="e.g. 233597789459" value="233597789459">
-            </div>
-
-            <button class="btn-submit" id="btn-generate">Generate Pairing Code</button>
-
-            <div class="code-box">
-                <span class="stat-label" style="display: block; margin-bottom: 6px;">PAIRING CODE</span>
-                <div class="code-display" id="pairing-code">• • • • - • • • •</div>
-                <button class="btn-copy" id="btn-copy">Copy</button>
-            </div>
+        <!-- STATUS -->
+        <div id="status" class="mt-6 p-3 rounded-xl bg-gray-500/20 text-gray-300">
+            Status: Disconnected
         </div>
 
-        <div class="status-badge" id="status-badge">Status: Offline</div>
     </div>
+</main>
 
-    <!-- Include Socket.io client script -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
+<!-- FOOTER -->
+<footer class="glass w-full p-4 text-center mt-auto">
+    <p>© 2026 <span class="font-bold text-purple-400">LANEZ</span>. All Rights Reserved.</p>
+    <p class="text-xs text-gray-400">Powered by LANEZ OS Pro v4.0</p>
+</footer>
 
-        const phoneInput = document.getElementById('phone');
-        const generateBtn = document.getElementById('btn-generate');
-        const codeDisplay = document.getElementById('pairing-code');
-        const copyBtn = document.getElementById('btn-copy');
-        const statusBadge = document.getElementById('status-badge');
-        const uptimeDisplay = document.getElementById('uptime-display');
+<!-- SOCKET.IO CLIENT -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
 
-        // Uptime counter
-        let seconds = 0;
-        setInterval(() => {
-            seconds++;
-            const mins = Math.floor(seconds / 60);
-            const hrs = Math.floor(mins / 60);
-            uptimeDisplay.innerText = `${hrs}h ${mins % 60}m ${seconds % 60}s`;
-        }, 1000);
+    const phoneInput = document.getElementById('phone');
+    const getCodeBtn = document.getElementById('btn-get-code');
+    const codeBox = document.getElementById('codeBox');
+    const codeDisplay = document.getElementById('code');
+    const copyBtn = document.getElementById('copyBtn');
+    const statusDiv = document.getElementById('status');
 
-        // Send number to socket on click
-        generateBtn.addEventListener('click', () => {
-            const phoneNum = phoneInput.value.replace(/[^0-9]/g, '');
-            if (!phoneNum) {
-                alert('Please enter a valid phone number');
-                return;
-            }
-            codeDisplay.innerText = 'GENERATING...';
-            socket.emit('get_pairing_code', phoneNum);
-        });
+    function getCode() {
+        const phone = phoneInput.value.replace(/[^0-9]/g, '');
+        if (!phone) return alert('Please enter a valid phone number');
 
-        // Receive pairing code from backend
-        socket.on('pairing_code', (code) => {
-            // Formats 8 character code into XXXX-XXXX
-            const formatted = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
-            codeDisplay.innerText = formatted;
-        });
+        getCodeBtn.disabled = true;
+        getCodeBtn.innerText = 'Generating Code...';
+        
+        codeDisplay.innerText = '••••-••••';
+        codeBox.classList.remove('hidden');
 
-        // Handle errors
-        socket.on('pairing_error', (err) => {
-            alert('Error: ' + err);
-            codeDisplay.innerText = 'FAILED';
-        });
+        // Emit request to Node backend via Socket.io
+        socket.emit('get_pairing_code', phone);
+    }
 
-        // Status listener
-        socket.on('status', (status) => {
-            statusBadge.innerText = `Status: ${status}`;
-            if (status === 'Connected') {
-                statusBadge.classList.add('connected');
-            } else {
-                statusBadge.classList.remove('connected');
-            }
-        });
+    // Socket Listener for incoming Pairing Code from Baileys
+    socket.on('pairing_code', (code) => {
+        getCodeBtn.disabled = false;
+        getCodeBtn.innerText = 'Get Pairing Code';
 
-        // Copy button
-        copyBtn.addEventListener('click', () => {
-            const codeText = codeDisplay.innerText.replace('-', '').trim();
-            if (codeText && !codeText.includes('•') && codeText !== 'GENERATING...') {
-                navigator.clipboard.writeText(codeText);
-                copyBtn.innerText = 'Copied!';
-                setTimeout(() => copyBtn.innerText = 'Copy', 2000);
-            }
-        });
-    </script>
+        // Format 8-digit code to XXXX-XXXX
+        const formattedCode = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+        codeDisplay.innerText = formattedCode;
+    });
+
+    // Socket Listener for Pairing Errors
+    socket.on('pairing_error', (errorMsg) => {
+        getCodeBtn.disabled = false;
+        getCodeBtn.innerText = 'Get Pairing Code';
+        alert('Error: ' + errorMsg);
+        codeDisplay.innerText = 'FAILED';
+    });
+
+    // Socket Listener for Connection Status updates
+    socket.on('status', (status) => {
+        if (status === 'Connected') {
+            statusDiv.className = 'mt-6 p-3 rounded-xl bg-green-500/20 text-green-300 font-semibold';
+            statusDiv.innerText = '✅ Connected Successfully!';
+        } else {
+            statusDiv.className = 'mt-6 p-3 rounded-xl bg-red-500/20 text-red-300';
+            statusDiv.innerText = 'Status: Disconnected';
+        }
+    });
+
+    function copyCode() {
+        const codeText = codeDisplay.innerText.replace('-', '').trim();
+        if (codeText && !codeText.includes('•') && codeText !== 'FAILED') {
+            navigator.clipboard.writeText(codeText);
+            copyBtn.innerText = 'Copied!';
+            setTimeout(() => copyBtn.innerText = 'Copy', 2000);
+        }
+    }
+</script>
+
 </body>
-    </html>
-    
+</html>
