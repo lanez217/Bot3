@@ -18,17 +18,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Socket connection for dashboard controls
 io.on('connection', (socket) => {
     console.log(`⚡ Dashboard Connected: ${socket.id}`);
 
-    socket.on('start_bot', async () => {
+    // Receive pairing request from web dashboard
+    socket.on('get_pairing_code', async (phoneNumber) => {
         try {
-            console.log('🚀 Invoking startBot() via Socket request...');
-            await startBot(io);
+            console.log(`📲 Requesting pairing code for: ${phoneNumber}`);
+            await startBot(io, phoneNumber);
         } catch (err) {
-            console.error('Bot Startup Error:', err);
-            socket.emit('bot_error', err.message);
+            console.error('Pairing Code Startup Error:', err);
+            socket.emit('pairing_error', err.message);
         }
     });
 
@@ -37,7 +37,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start Express server and initialize WhatsApp connection
 server.listen(PORT, async () => {
     console.log(`🌐 Server running on http://localhost:${PORT}`);
     try {
@@ -46,3 +45,4 @@ server.listen(PORT, async () => {
         console.error('Bot Startup Error:', err);
     }
 });
+        
