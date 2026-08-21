@@ -4,9 +4,16 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 const OWNER_NUM = '233597789459';
 
+// Helper function to check if the sender is the owner
+const checkIsOwner = (sender) => {
+    if (!sender) return false;
+    const cleanNumber = sender.replace(/[^0-9]/g, '');
+    return cleanNumber === OWNER_NUM;
+};
+
 const COMMANDS = [
     // ==========================================
-    // 1. SYSTEM & INFO (10 COMMANDS)
+    // 1. SYSTEM & INFO
     // ==========================================
     { name: 'ping', cat: 'SYSTEM', desc: 'Check bot response speed', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🏓 LANEZ OS: 100% Operational' }) },
     { name: 'runtime', cat: 'SYSTEM', desc: 'Uptime duration', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `⏱️ Uptime: ${Math.floor(process.uptime())}s` }) },
@@ -24,7 +31,7 @@ const COMMANDS = [
     { name: 'status', cat: 'SYSTEM', desc: 'Overall status', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🟢 All Services Operational' }) },
 
     // ==========================================
-    // 2. MEDIA & DOWNLOADS (10 COMMANDS)
+    // 2. MEDIA & DOWNLOADS (FIXED AUDIO/VIDEO/IMAGE)
     // ==========================================
     {
         name: 'play',
@@ -37,16 +44,27 @@ const COMMANDS = [
             const s = await yts(query);
             if (!s.videos.length) return sock.sendMessage(from, { text: '❌ Music not found.' });
             const v = s.videos[0];
-            await sock.sendMessage(from, { text: `📥 Downloading: *${v.title}*` });
+            
+            await sock.sendMessage(from, { text: `📥 Fetching audio stream for: *${v.title}*...` });
             try {
-                const res = await axios.get(`https://api.cobalt.tools/api/json?url=${encodeURIComponent(v.url)}`, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                // Primary download source
+                const res = await axios.get(`https://api.cobalt.tools/api/json?url=${encodeURIComponent(v.url)}`, {
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                
                 if (res.data?.url) {
                     await sock.sendMessage(from, { audio: { url: res.data.url }, mimetype: 'audio/mp4', ptt: false }, { quoted: msg });
                 } else {
-                    sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎵 *${v.title}*\n🔗 ${v.url}\n\n_(Direct stream failed, click link to play)_` });
+                    // Fallback source if primary fails
+                    const fallback = await axios.get(`https://api.vreden.web.id/api/ytmp3?url=${encodeURIComponent(v.url)}`);
+                    if (fallback.data?.result?.download?.url) {
+                        await sock.sendMessage(from, { audio: { url: fallback.data.result.download.url }, mimetype: 'audio/mp4', ptt: false }, { quoted: msg });
+                    } else {
+                        throw new Error('All download API endpoints failed');
+                    }
                 }
             } catch (e) {
-                sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎵 *${v.title}*\n🔗 ${v.url}` });
+                sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎵 *${v.title}*\n🔗 ${v.url}\n\n⚠️ Could not process direct audio stream right now.` });
             }
         }
     },
@@ -61,16 +79,48 @@ const COMMANDS = [
             const s = await yts(query);
             if (!s.videos.length) return sock.sendMessage(from, { text: '❌ Video not found.' });
             const v = s.videos[0];
-            await sock.sendMessage(from, { text: `📥 Fetching: *${v.title}*` });
+            
+            await sock.sendMessage(from, { text: `📥 Fetching video stream for: *${v.title}*...` });
             try {
-                const res = await axios.get(`https://api.cobalt.tools/api/json?url=${encodeURIComponent(v.url)}`, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                const res = await axios.get(`https://api.cobalt.tools/api/json?url=${encodeURIComponent(v.url)}`, {
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                
                 if (res.data?.url) {
                     await sock.sendMessage(from, { video: { url: res.data.url }, caption: `🎥 *${v.title}*` }, { quoted: msg });
                 } else {
-                    sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎥 *${v.title}*\n🔗 ${v.url}` });
+                    const fallback = await axios.get(`https://api.vreden.web.id/api/ytmp4?url=${encodeURIComponent(v.url)}`);
+                    if (fallback.data?.result?.download?.url) {
+                        await sock.sendMessage(from, { video: { url: fallback.data.result.download.url }, caption: `🎥 *${v.title}*` }, { quoted: msg });
+                    } else {
+                        throw new Error('All video endpoints failed');
+                    }
                 }
             } catch (e) {
-                sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎥 *${v.title}*\n🔗 ${v.url}` });
+                sock.sendMessage(from, { image: { url: v.thumbnail }, caption: `🎥 *${v.title}*\n🔗 ${v.url}\n\n⚠️ Could not process direct video stream right now.` });
+            }
+        }
+    },
+    {
+        name: 'imgsearch',
+        cat: 'MEDIA',
+        desc: 'Search & Send Image',
+        exec: async ({ sock, from, args }) => {
+            const query = args.join(' ');
+            if (!query) return sock.sendMessage(from, { text: '⚠️ Enter an image search query.' });
+            await sock.sendMessage(from, { text: `🖼️ Searching image for: *${query}*...` });
+            try {
+                const res = await axios.get(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&client_id=client_id_placeholder`);
+                if (res.data?.urls?.regular) {
+                    await sock.sendMessage(from, { image: { url: res.data.urls.regular }, caption: `📸 Results for: *${query}*` });
+                } else {
+                    // Fallback to image source
+                    const imgUrl = `https://source.unsplash.com/1600x900/?${encodeURIComponent(query)}`;
+                    await sock.sendMessage(from, { image: { url: imgUrl }, caption: `📸 Results for: *${query}*` });
+                }
+            } catch (e) {
+                const imgUrl = `https://source.unsplash.com/1600x900/?${encodeURIComponent(query)}`;
+                sock.sendMessage(from, { image: { url: imgUrl }, caption: `📸 Results for: *${query}*` });
             }
         }
     },
@@ -98,12 +148,11 @@ const COMMANDS = [
     { name: 'ytdl', cat: 'MEDIA', desc: 'Download YouTube link', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `Use .play or .video with query or link.` }) },
     { name: 'song', cat: 'MEDIA', desc: 'Alias for .play', exec: async ({ sock, from, args, msg }) => COMMANDS.find(c=>c.name==='play').exec({sock,from,args,msg}) },
     { name: 'mp4', cat: 'MEDIA', desc: 'Alias for .video', exec: async ({ sock, from, args, msg }) => COMMANDS.find(c=>c.name==='video').exec({sock,from,args,msg}) },
-    { name: 'imgsearch', cat: 'MEDIA', desc: 'Image search helper', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🖼️ Search image feature active.` }) },
     { name: 'lyrics', cat: 'MEDIA', desc: 'Song lyrics lookup', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎵 Lyrics search for "${args.join(' ')}" initialized.` }) },
     { name: 'spotify', cat: 'MEDIA', desc: 'Spotify search', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎧 Spotify track search active.` }) },
 
     // ==========================================
-    // 3. GROUP MANAGEMENT (15 COMMANDS)
+    // 3. GROUP MANAGEMENT
     // ==========================================
     { name: 'kick', cat: 'GROUP', group: true, adminOnly: true, desc: 'Kick user', exec: async ({ sock, from, mentioned }) => {
         if (!mentioned[0]) return sock.sendMessage(from, { text: '⚠️ Mention a user.' });
@@ -175,19 +224,22 @@ const COMMANDS = [
     { name: 'unmute', cat: 'GROUP', group: true, adminOnly: true, desc: 'Unmute group chat', exec: async ({ sock, from }) => COMMANDS.find(c=>c.name==='group').exec({sock,from,args:['open']}) },
 
     // ==========================================
-    // 4. OWNER PREMIUM COMMANDS (15 COMMANDS)
+    // 4. OWNER PREMIUM COMMANDS (FIXED CHECKS)
     // ==========================================
-    { name: 'restart', cat: 'OWNER', ownerOnly: true, desc: 'Reboot bot server', exec: async ({ sock, from }) => {
+    { name: 'restart', cat: 'OWNER', ownerOnly: true, desc: 'Reboot bot server', exec: async ({ sock, from, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         await sock.sendMessage(from, { text: '♻️ Restarting LANEZ OS Engine...' });
         process.exit(1);
     }},
-    { name: 'broadcast', cat: 'OWNER', ownerOnly: true, desc: 'Global announcement', exec: async ({ sock, from, args }) => {
+    { name: 'broadcast', cat: 'OWNER', ownerOnly: true, desc: 'Global announcement', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         const msg = args.join(' ');
         if (!msg) return sock.sendMessage(from, { text: '⚠️ Provide broadcast message.' });
         sock.sendMessage(from, { text: `📢 *GLOBAL OWNER ANNOUNCEMENT*\n\n${msg}` });
     }},
-    { name: 'bc', cat: 'OWNER', ownerOnly: true, desc: 'Alias for broadcast', exec: async ({ sock, from, args }) => COMMANDS.find(c=>c.name==='broadcast').exec({sock,from,args}) },
-    { name: 'eval', cat: 'OWNER', ownerOnly: true, desc: 'Execute JS expression', exec: async ({ sock, from, args }) => {
+    { name: 'bc', cat: 'OWNER', ownerOnly: true, desc: 'Alias for broadcast', exec: async ({ sock, from, args, sender }) => COMMANDS.find(c=>c.name==='broadcast').exec({sock,from,args,sender}) },
+    { name: 'eval', cat: 'OWNER', ownerOnly: true, desc: 'Execute JS expression', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         try {
             let evaled = eval(args.join(' '));
             sock.sendMessage(from, { text: `💻 *Result:*\n\`\`\`${require('util').inspect(evaled)}\`\`\`` });
@@ -195,55 +247,66 @@ const COMMANDS = [
             sock.sendMessage(from, { text: `❌ *Error:*\n\`\`\`${e.message}\`\`\`` });
         }
     }},
-    { name: 'clearauth', cat: 'OWNER', ownerOnly: true, desc: 'Wipe authentication directory', exec: async ({ sock, from }) => {
+    { name: 'clearauth', cat: 'OWNER', ownerOnly: true, desc: 'Wipe authentication directory', exec: async ({ sock, from, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         require('fs').rmSync('auth_info_lanez', { recursive: true, force: true });
         sock.sendMessage(from, { text: '🧹 Session folder cleared. Restarting...' });
         process.exit(1);
     }},
-    { name: 'leave', cat: 'OWNER', ownerOnly: true, group: true, desc: 'Bot exits group', exec: async ({ sock, from }) => {
+    { name: 'leave', cat: 'OWNER', ownerOnly: true, group: true, desc: 'Bot exits group', exec: async ({ sock, from, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         await sock.sendMessage(from, { text: '👋 LANEZ OS Leaving group...' });
         await sock.groupLeave(from);
     }},
-    { name: 'join', cat: 'OWNER', ownerOnly: true, desc: 'Join group via invite link', exec: async ({ sock, from, args }) => {
+    { name: 'join', cat: 'OWNER', ownerOnly: true, desc: 'Join group via invite link', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         if (!args[0]) return sock.sendMessage(from, { text: '⚠️ Provide link.' });
         const code = args[0].split('chat.whatsapp.com/')[1] || args[0];
         await sock.groupAcceptInvite(code);
         sock.sendMessage(from, { text: '✅ Joined group successfully!' });
     }},
-    { name: 'block', cat: 'OWNER', ownerOnly: true, desc: 'Block user', exec: async ({ sock, from, mentioned }) => {
+    { name: 'block', cat: 'OWNER', ownerOnly: true, desc: 'Block user', exec: async ({ sock, from, mentioned, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         if (!mentioned[0]) return sock.sendMessage(from, { text: '⚠️ Mention user.' });
         await sock.updateBlockStatus(mentioned[0], 'block');
         sock.sendMessage(from, { text: '⛔ User blocked.' });
     }},
-    { name: 'unblock', cat: 'OWNER', ownerOnly: true, desc: 'Unblock user', exec: async ({ sock, from, mentioned }) => {
+    { name: 'unblock', cat: 'OWNER', ownerOnly: true, desc: 'Unblock user', exec: async ({ sock, from, mentioned, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         if (!mentioned[0]) return sock.sendMessage(from, { text: '⚠️ Mention user.' });
         await sock.updateBlockStatus(mentioned[0], 'unblock');
         sock.sendMessage(from, { text: '✅ User unblocked.' });
     }},
-    { name: 'setprefix', cat: 'OWNER', ownerOnly: true, desc: 'Set custom prefix', exec: async ({ sock, from, args }) => {
+    { name: 'setprefix', cat: 'OWNER', ownerOnly: true, desc: 'Set custom prefix', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         if (!args[0]) return sock.sendMessage(from, { text: '⚠️ Provide new prefix.' });
         sock.sendMessage(from, { text: `📌 Prefix updated to [ ${args[0]} ]` });
     }},
-    { name: 'setbotname', cat: 'OWNER', ownerOnly: true, desc: 'Update bot display name', exec: async ({ sock, from, args }) => {
+    { name: 'setbotname', cat: 'OWNER', ownerOnly: true, desc: 'Update bot display name', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         if (!args.join(' ')) return sock.sendMessage(from, { text: '⚠️ Provide bot name.' });
         sock.sendMessage(from, { text: `🤖 Bot name set to: *${args.join(' ')}*` });
     }},
-    { name: 'shutdown', cat: 'OWNER', ownerOnly: true, desc: 'Turn off bot instance', exec: async ({ sock, from }) => {
+    { name: 'shutdown', cat: 'OWNER', ownerOnly: true, desc: 'Turn off bot instance', exec: async ({ sock, from, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         await sock.sendMessage(from, { text: '🛑 Shutting down LANEZ OS...' });
         process.exit(0);
     }},
-    { name: 'mode', cat: 'OWNER', ownerOnly: true, desc: 'Set public/private mode', exec: async ({ sock, from, args }) => {
+    { name: 'mode', cat: 'OWNER', ownerOnly: true, desc: 'Set public/private mode', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         sock.sendMessage(from, { text: `⚙️ Bot access mode updated to: *${args[0] || 'Public'}*` });
     }},
-    { name: 'setpp', cat: 'OWNER', ownerOnly: true, desc: 'Set bot profile pic', exec: async ({ sock, from }) => {
+    { name: 'setpp', cat: 'OWNER', ownerOnly: true, desc: 'Set bot profile pic', exec: async ({ sock, from, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         sock.sendMessage(from, { text: '🖼️ Reply to an image to set profile photo.' });
     }},
-    { name: 'autostatus', cat: 'OWNER', ownerOnly: true, desc: 'Toggle auto status view', exec: async ({ sock, from, args }) => {
+    { name: 'autostatus', cat: 'OWNER', ownerOnly: true, desc: 'Toggle auto status view', exec: async ({ sock, from, args, sender }) => {
+        if (!checkIsOwner(sender)) return sock.sendMessage(from, { text: '❌ Owner command only.' });
         sock.sendMessage(from, { text: `👀 Auto status read: ${args[0] || 'ENABLED'}` });
     }},
 
     // ==========================================
-    // 5. FUN & GAMES (20 COMMANDS)
+    // 5. FUN & GAMES
     // ==========================================
     { name: 'joke', cat: 'FUN', desc: 'Random joke generator', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '😂 Why do programmers prefer dark mode? Because light attracts bugs!' }) },
     { name: 'roll', cat: 'FUN', desc: 'Roll a die', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🎲 Rolled: ${Math.floor(Math.random() * 6) + 1}` }) },
@@ -254,7 +317,7 @@ const COMMANDS = [
     }},
     { name: 'fact', cat: 'FUN', desc: 'Random fact', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '💡 Fact: Honey never spoils. 3000-year-old honey found in Egyptian tombs is still edible!' }) },
     { name: 'quote', cat: 'FUN', desc: 'Motivational quote', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '💬 "The best way to predict the future is to create it." — Peter Drucker' }) },
-    { name: 'gay', cat: 'FUN', desc: 'Gay rate test', exec: async ({ sock, from, mentioned }) => sock.sendMessage(from, { text: `🏳️‍🌈 Rating: ${Math.floor(Math.random() * 100)}%` }) },
+    { name: 'gay', cat: 'FUN', desc: 'Gay rate test', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🏳️‍🌈 Rating: ${Math.floor(Math.random() * 100)}%` }) },
     { name: 'lesbian', cat: 'FUN', desc: 'Lesbian rate test', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🏳️‍🌈 Rating: ${Math.floor(Math.random() * 100)}%` }) },
     { name: 'ship', cat: 'FUN', desc: 'Ship compatibility', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `❤️ Match Compatibility: ${Math.floor(Math.random() * 100)}%` }) },
     { name: 'hack', cat: 'FUN', desc: 'Prank hack user', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `💻 Hacking ${args[0] || 'Target'}...\n[||||||||||] 100%\nPassword found: 12345678` }) },
@@ -294,13 +357,13 @@ const COMMANDS = [
     }},
 
     // ==========================================
-    // 6. UTILITY & TOOLS (15 COMMANDS)
+    // 6. UTILITY & TOOLS
     // ==========================================
-    { name: 'sticker', cat: 'UTILITY', desc: 'Convert image/video to sticker', exec: async ({ sock, from, msg }) => {
+    { name: 'sticker', cat: 'UTILITY', desc: 'Convert image/video to sticker', exec: async ({ sock, from }) => {
         sock.sendMessage(from, { text: '🖼️ Send or reply to an image/video to make a sticker.' });
     }},
     { name: 's', cat: 'UTILITY', desc: 'Alias for .sticker', exec: async ({ sock, from, msg }) => COMMANDS.find(c=>c.name==='sticker').exec({sock,from,msg}) },
-    { name: 'toimg', cat: 'UTILITY', desc: 'Convert sticker to image', exec: async ({ sock, from, msg }) => {
+    { name: 'toimg', cat: 'UTILITY', desc: 'Convert sticker to image', exec: async ({ sock, from }) => {
         sock.sendMessage(from, { text: '🖼️ Reply to a sticker to convert to image.' });
     }},
     { name: 'shorten', cat: 'UTILITY', desc: 'Shorten URL', exec: async ({ sock, from, args }) => {
@@ -342,7 +405,7 @@ const COMMANDS = [
     { name: 'tts', cat: 'UTILITY', desc: 'Text to speech audio', exec: async ({ sock, from, args }) => {
         sock.sendMessage(from, { text: `🗣️ Converting "${args.join(' ')}" to voice...` });
     }},
-    { name: 'inspect', cat: 'UTILITY', desc: 'Inspect group link', exec: async ({ sock, from, args }) => {
+    { name: 'inspect', cat: 'UTILITY', desc: 'Inspect group link', exec: async ({ sock, from }) => {
         sock.sendMessage(from, { text: '🔍 Inspecting invite link payload...' });
     }},
     { name: 'base64', cat: 'UTILITY', desc: 'Base64 encoder/decoder', exec: async ({ sock, from, args }) => {
@@ -351,7 +414,7 @@ const COMMANDS = [
     }},
 
     // ==========================================
-    // 7. AI & SEARCH (15 COMMANDS)
+    // 7. AI & SEARCH
     // ==========================================
     { name: 'ai', cat: 'AI', desc: 'Ask AI Chatbot', exec: async ({ sock, from, args }) => {
         const query = args.join(' ');
@@ -372,9 +435,7 @@ const COMMANDS = [
         if (!args.join(' ')) return sock.sendMessage(from, { text: '⚠️ Enter search query.' });
         sock.sendMessage(from, { text: `📚 *Wikipedia Result for ${args.join(' ')}:* Placeholder data.` });
     }},
-    { name: 'pinterest', cat: 'AI', desc: 'Pinterest image search', exec: async ({ sock, from, args }) => {
-        sock.sendMessage(from, { text: `📌 Searching Pinterest for ${args.join(' ')}...` });
-    }},
+    { name: 'pinterest', cat: 'AI', desc: 'Pinterest image search', exec: async ({ sock, from, args }) => COMMANDS.find(c=>c.name==='imgsearch').exec({sock,from,args}) },
     { name: 'gemini', cat: 'AI', desc: 'Ask Gemini AI', exec: async ({ sock, from, args }) => COMMANDS.find(c=>c.name==='ai').exec({sock,from,args}) },
     { name: 'deepseek', cat: 'AI', desc: 'Ask DeepSeek AI', exec: async ({ sock, from, args }) => COMMANDS.find(c=>c.name==='ai').exec({sock,from,args}) },
     { name: 'math', cat: 'AI', desc: 'AI math problem solver', exec: async ({ sock, from, args }) => {
@@ -393,7 +454,7 @@ const COMMANDS = [
     { name: 'chatgpt', cat: 'AI', desc: 'Alias for .ai', exec: async ({ sock, from, args }) => COMMANDS.find(c=>c.name==='ai').exec({sock,from,args}) },
 
     // ==========================================
-    // 8. HELP & GENERAL (5 COMMANDS)
+    // 8. HELP & GENERAL
     // ==========================================
     {
         name: 'menu',
@@ -421,4 +482,5 @@ const COMMANDS = [
 ];
 
 module.exports = COMMANDS;
+                                                           
             
