@@ -1,7 +1,7 @@
 {
   "name": "lanez-os-bot",
   "version": "2.0.0",
-  "description": "WhatsApp Bot powered by Baileys and Express",
+  "description": "WhatsApp Bot powered by Baileys, Express, and Socket.io",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
