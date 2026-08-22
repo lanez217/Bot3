@@ -1,17 +1,23 @@
-// commands.js - LANEZ OS PRO Commands List
+// Function to format real uptime
+function getUptime(startTime) {
+    const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}h ${minutes}m ${seconds}s`;
+}
 
-const menuText = `
+function getMenu(startTime) {
+    return `
 ╭───────────────⊷
 │  🤖 LANEZ OS PRO BOT
-│  Uptime: 15h 44s
-│  Ping: 66ms
+│  Uptime: ${getUptime(startTime)}
 │  Version: v2.0.0
 │  Owner: LANEZ
 ╰───────────────⊷
 
 ┌─⊷ *Free Bot*
 │ bot: most active
-│ emmyhenztech
 │ Owner: LANEZ
 └───────────────⊷
 
@@ -205,28 +211,26 @@ const menuText = `
 │ • alive <bot status>
 │ • chatbot <toggle AI chat>
 ╰──────────────────⊷
-
-╭──❏ *ABOUT US* ❏
-│ MultiDevice WhatsApp Bot ❤️
-│ Creator: LANEZ
-│ t.me/laneztech
-│ github.com/laneztech
-│ Thanks For Using Our Bot 🙏
-╰──────────────────⊷
 `;
+}
 
 const COMMANDS = [
-    // MENU COMMAND
     {
         name: 'menu',
         aliases: ['help', 'commands'],
-        category: 'general',
-        exec: async ({ sock, from }) => {
-            await sock.sendMessage(from, { text: menuText });
+        exec: async ({ sock, from, startTime }) => {
+            await sock.sendMessage(from, { text: getMenu(startTime) });
         }
     },
-
-    // GROUP MANAGER
+    {
+        name: 'ping',
+        exec: async ({ sock, from, startTime }) => {
+            const start = Date.now();
+            await sock.sendMessage(from, { text: '🏓 Testing ping...' });
+            const latency = Date.now() - start;
+            await sock.sendMessage(from, { text: `🏓 Pong! Speed: ${latency}ms\n⏱️ Uptime: ${getUptime(startTime)}` });
+        }
+    },
     { name: 'ban', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🔨 Ban execution trigger' }) },
     { name: 'unban', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🔓 Unban execution trigger' }) },
     { name: 'promote', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '👑 Promoted to Admin' }) },
@@ -249,8 +253,6 @@ const COMMANDS = [
     { name: 'groupinfo', exec: async ({ sock, from }) => sock.sendMessage(from, { text: 'ℹ️ Fetching Group Info...' }) },
     { name: 'gcopen', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🔓 Group opening status...' }) },
     { name: 'jid', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🆔 JID: ${from}` }) },
-
-    // SECURITY
     { name: 'unlink', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🛡️ Link protection triggered' }) },
     { name: 'antilink', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🔗 Antilink setting toggled' }) },
     { name: 'antitag', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🏷️ Antitag toggled' }) },
@@ -263,8 +265,6 @@ const COMMANDS = [
     { name: 'unlockgroup', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🔓 Group unlocked' }) },
     { name: 'warn', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '⚠️ Member warned' }) },
     { name: 'warnings', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '📜 Checking warnings list...' }) },
-
-    // SETTINGS
     { name: 'mode', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🛠️ Mode set to: ${args[0] || 'public'}` }) },
     { name: 'autostatus', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '👁️ Auto status view toggled' }) },
     { name: 'autotyping', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '⌨️ Auto typing toggled' }) },
@@ -275,23 +275,17 @@ const COMMANDS = [
     { name: 'setbiobio', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `✏️ Bio set to: ${args.join(' ')}` }) },
     { name: 'clearsession', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🧹 Session cleared successfully' }) },
     { name: 'clear', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🗑 Temporary files cleared' }) },
-
-    // AI MENU
     { name: 'gpt', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🤖 GPT Thinking: ${args.join(' ')}` }) },
     { name: 'gemini', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `✨ Gemini Thinking: ${args.join(' ')}` }) },
     { name: 'imagine', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎨 Generating Image for: ${args.join(' ')}` }) },
     { name: 'flux', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `⚡ Generating Flux Image: ${args.join(' ')}` }) },
     { name: 'dalle', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🖼️ Generating DALL-E Image: ${args.join(' ')}` }) },
-
-    // DOWNLOADER
     { name: 'play', aliases: ['song', 'music'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎵 Searching track: ${args.join(' ')}` }) },
     { name: 'ytmp3', aliases: ['mp3'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎧 Downloading MP3 from: ${args[0]}` }) },
     { name: 'video', aliases: ['ytmp4'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🎬 Downloading Video from: ${args[0]}` }) },
     { name: 'tiktok', aliases: ['tt'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `📱 Downloading TikTok video: ${args[0]}` }) },
     { name: 'facebook', aliases: ['fb'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `📘 Downloading Facebook video: ${args[0]}` }) },
     { name: 'insta', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `📸 Downloading Instagram post: ${args[0]}` }) },
-
-    // UTILITY & TOOLS
     { name: 'ss', aliases: ['ssweb'], exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `📸 Taking screenshot of ${args[0]}` }) },
     { name: 'translate', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🌐 Translating: ${args.join(' ')}` }) },
     { name: 'tourl', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🔗 Converting media to URL...` }) },
@@ -314,8 +308,6 @@ const COMMANDS = [
     { name: 'device', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `📱 Device: LANEZ OS Engine v2.0` }) },
     { name: 'delete', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🗑 Deleting target message...` }) },
     { name: 'vv2', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `👁️ Bypassing View Once media...` }) },
-
-    // STICKER & IMAGE
     { name: 'sticker', aliases: ['s'], exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🖼 Converting to sticker...` }) },
     { name: 'crop', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `✂️ Cropping sticker...` }) },
     { name: 'blur', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🌫 Blurring image...` }) },
@@ -324,8 +316,6 @@ const COMMANDS = [
     { name: 'tgsticker', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `📥 Fetching Telegram sticker set: ${args[0]}` }) },
     { name: 'emojimix', exec: async ({ sock, from, args }) => sock.sendMessage(from, { text: `🔀 Mixing emojis: ${args.join(' ')}` }) },
     { name: 'meme', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🤣 Fetching fresh meme...` }) },
-
-    // FUN & SOCIAL
     { name: 'compliment', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `✨ You are performing amazingly today!` }) },
     { name: 'insult', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🔥 Roasted!` }) },
     { name: 'flirt', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `😉 Are you a Wi-Fi router? Because I'm feeling a connection.` }) },
@@ -344,14 +334,11 @@ const COMMANDS = [
     { name: 'goodnight', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🌙 Goodnight! Have sweet dreams.` }) },
     { name: 'roseday', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🌹 Happy Rose Day!` }) },
     { name: 'character', exec: async ({ sock, from }) => sock.sendMessage(from, { text: `🎭 Character details retrieved!` }) },
-
-    // BOT INFO
     { name: 'github', aliases: ['git'], exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🌐 GitHub Repository: https://github.com/laneztech' }) },
-    { name: 'owner', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '👑 Bot Owner: LANEZ (t.me/laneztech)' }) },
-    { name: 'ping', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🏓 Pong! Speed: 66ms' }) },
+    { name: 'owner', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '👑 Bot Owner: LANEZ' }) },
     { name: 'alive', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🤖 LANEZ OS PRO is active and online!' }) },
     { name: 'chatbot', exec: async ({ sock, from }) => sock.sendMessage(from, { text: '🤖 AI Chatbot mode toggled.' }) }
 ];
 
 module.exports = COMMANDS;
-    
+                                                                                                                            
