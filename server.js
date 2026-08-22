@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
@@ -8,41 +7,68 @@ const { startBot } = require('./bot');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-    res.send('LANEZ OS Engine Active.');
+let activePairingCode = null;
+
+// API route for index.html live stats
+app.get('/api/uptime', (req, res) => {
+    const totalSeconds = Math.floor(process.uptime());
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    res.json({ uptime: `${hours}h ${minutes}m ${seconds}s` });
 });
 
-io.on('connection', (socket) => {
-    socket.on('get_pairing_code', async (phone) => {
-        console.log(`📱 Pairing code requested for: ${phone}`);
+// Pairing code endpoint for HTML fetch request
+app.post('/pair', async (req, res) => {
+    const { number } = req.body;
+    if (!number) return res.status(400).json({ error: 'Phone number is required.' });
 
-        const sessionPath = path.join(__dirname, 'auth_info_lanez');
-        if (fs.existsSync(sessionPath)) {
-            try {
-                fs.rmSync(sessionPath, { recursive: true, force: true });
-                console.log('🧹 Cleared old session folder.');
-            } catch (err) {
-                console.error('Failed to clear old session:', err.message);
-            }
+    console.log(`📱 Pairing code requested for: ${number}`);
+
+    // Clear session to prevent connection locks on fresh pairing
+    const sessionPath = path.join(__dirname, 'auth_info_lanez');
+    if (fs.existsSync(sessionPath)) {
+        try {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+            console.log('🧹 Cleared existing session folder.');
+        } catch (err) {
+            console.error('Failed to clear session:', err.message);
         }
+    }
 
-        startBot(io, phone);
+    activePairingCode = null;
+
+    // Trigger pairing in Baileys
+    startBot(number, (code) => {
+        activePairingCode = code;
     });
+
+    // Poll for generated pairing code
+    let attempts = 0;
+    while (!activePairingCode && attempts < 20) {
+        await new Promise((r) => setTimeout(r, 500));
+        attempts++;
+    }
+
+    if (activePairingCode) {
+        return res.json({ code: activePairingCode });
+    } else {
+        return res.status(500).json({ error: 'Failed to generate code. Please try again.' });
+    }
 });
 
-startBot(io);
+// Start default bot loop on boot
+startBot();
 
-// Keep-alive ping for Render
+// Render Keep-Alive Ping
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_URL) {
     setInterval(async () => {
-        try {
-            await axios.get(RENDER_URL);
-        } catch (e) {}
+        try { await axios.get(RENDER_URL); } catch (e) {}
     }, 4 * 60 * 1000);
 }
 
@@ -51,4 +77,4 @@ process.on('unhandledRejection', (reason) => console.error('Unhandled Rejection:
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
-                                                       
+    
