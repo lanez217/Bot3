@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const COMMANDS = require('./commands');
 
 const startTime = Date.now();
@@ -9,6 +9,10 @@ async function startBot(io = null, phoneNumber = null) {
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
+        keepAliveIntervalMs: 30000, // Fixes 1-minute timeout/silent drop
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 0,
+        syncFullHistory: false
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -22,7 +26,7 @@ async function startBot(io = null, phoneNumber = null) {
                 if (io) io.emit('pairing_code', code);
             } catch (err) {
                 console.error('Error generating pairing code:', err);
-                if (io) io.emit('pairing_error', 'Failed to generate code. Try again.');
+                if (io) io.emit('pairing_error', 'Failed to generate code.');
             }
         }, 3000);
     }
@@ -31,17 +35,17 @@ async function startBot(io = null, phoneNumber = null) {
         const { connection, lastDisconnect } = update;
 
         if (connection === 'open') {
-            console.log('✅ WhatsApp Bot Connected Successfully!');
+            console.log('✅ WhatsApp Bot Connected & Listening!');
             if (io) io.emit('status', 'Connected');
         } else if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('⚠️ Connection closed. Reconnecting:', shouldReconnect);
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ Connection closed (${statusCode}). Reconnecting: ${shouldReconnect}`);
             if (io) io.emit('status', 'Disconnected');
             if (shouldReconnect) startBot(io, null);
         }
     });
 
-    // Message Upsert Listener
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
@@ -49,7 +53,7 @@ async function startBot(io = null, phoneNumber = null) {
 
             const from = msg.key.remoteJid;
 
-            // Extract message text from all formats
+            // Extract body text across all message types
             const body = (
                 msg.message.conversation ||
                 msg.message.extendedTextMessage?.text ||
@@ -58,39 +62,43 @@ async function startBot(io = null, phoneNumber = null) {
                 ''
             ).trim();
 
-            console.log(`📩 Incoming message from ${from}: "${body}"`);
+            // Antilink logic enforcement for group chats
+            if (from.endsWith('@g.us') && body.includes('chat.whatsapp.com')) {
+                const config = require('./commands').config;
+                if (config.antilink[from]) {
+                    const sender = msg.key.participant;
+                    console.log(`🛡️ Antilink triggered for ${sender}`);
+                    await sock.sendMessage(from, { delete: msg.key });
+                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                    return;
+                }
+            }
 
-            // Prefix check
             const prefix = '.';
             if (!body.startsWith(prefix)) return;
 
             const args = body.slice(prefix.length).trim().split(/ +/);
             const cmdName = args.shift().toLowerCase();
 
-            // Find command or alias match
-            const command = COMMANDS.find(c => c.name === cmdName || (c.aliases && c.aliases.includes(cmdName)));
-
-            if (!command) {
-                console.log(`❓ Command not found: .${cmdName}`);
-                return;
-            }
+            const command = COMMANDS.commands.find(c => c.name === cmdName || (c.aliases && c.aliases.includes(cmdName)));
+            if (!command) return;
 
             console.log(`🚀 Executing command: .${cmdName}`);
 
             const sender = msg.key.participant || msg.key.remoteJid;
             const isGroup = from.endsWith('@g.us');
 
-            let participants = [];
-            if (isGroup) {
-                try {
-                    const groupMetadata = await sock.groupMetadata(from);
-                    participants = groupMetadata.participants;
-                } catch (e) {}
-            }
+            await command.exec({ 
+                sock, 
+                from, 
+                args, 
+                msg, 
+                sender, 
+                isGroup, 
+                startTime, 
+                downloadMediaMessage 
+            });
 
-            const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-
-            await command.exec({ sock, from, args, msg, sender, isGroup, participants, mentioned, startTime });
         } catch (err) {
             console.error('❌ Error handling message:', err);
         }
