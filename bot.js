@@ -3,7 +3,7 @@ const COMMANDS = require('./commands');
 
 const startTime = Date.now();
 
-async function startBot(io, phoneNumber = null) {
+async function startBot(io = null, phoneNumber = null) {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_lanez');
 
     const sock = makeWASocket({
@@ -41,54 +41,60 @@ async function startBot(io, phoneNumber = null) {
         }
     });
 
-    // Enhanced Message & Command Handler
+    // Message Upsert Listener
     sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg || !msg.message || msg.key.fromMe) return;
-
-        const from = msg.key.remoteJid;
-
-        // Extract body text across different message types (normal, extended, caption)
-        const body = (
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text ||
-            msg.message.imageMessage?.caption ||
-            msg.message.videoMessage?.caption ||
-            ''
-        ).trim();
-
-        const prefix = '.';
-        if (!body.startsWith(prefix)) return;
-
-        const args = body.slice(prefix.length).trim().split(/ +/);
-        const cmdName = args.shift().toLowerCase();
-
-        // Match command by name OR alias
-        const command = COMMANDS.find(c => c.name === cmdName || (c.aliases && c.aliases.includes(cmdName)));
-
-        if (!command) return;
-
-        const sender = msg.key.participant || msg.key.remoteJid;
-        const isGroup = from.endsWith('@g.us');
-
-        let participants = [];
-        if (isGroup) {
-            try {
-                const groupMetadata = await sock.groupMetadata(from);
-                participants = groupMetadata.participants;
-            } catch (e) {}
-        }
-
-        const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-
         try {
+            const msg = m.messages[0];
+            if (!msg || !msg.message) return;
+
+            const from = msg.key.remoteJid;
+
+            // Extract message text from all formats
+            const body = (
+                msg.message.conversation ||
+                msg.message.extendedTextMessage?.text ||
+                msg.message.imageMessage?.caption ||
+                msg.message.videoMessage?.caption ||
+                ''
+            ).trim();
+
+            console.log(`📩 Incoming message from ${from}: "${body}"`);
+
+            // Prefix check
+            const prefix = '.';
+            if (!body.startsWith(prefix)) return;
+
+            const args = body.slice(prefix.length).trim().split(/ +/);
+            const cmdName = args.shift().toLowerCase();
+
+            // Find command or alias match
+            const command = COMMANDS.find(c => c.name === cmdName || (c.aliases && c.aliases.includes(cmdName)));
+
+            if (!command) {
+                console.log(`❓ Command not found: .${cmdName}`);
+                return;
+            }
+
+            console.log(`🚀 Executing command: .${cmdName}`);
+
+            const sender = msg.key.participant || msg.key.remoteJid;
+            const isGroup = from.endsWith('@g.us');
+
+            let participants = [];
+            if (isGroup) {
+                try {
+                    const groupMetadata = await sock.groupMetadata(from);
+                    participants = groupMetadata.participants;
+                } catch (e) {}
+            }
+
+            const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
             await command.exec({ sock, from, args, msg, sender, isGroup, participants, mentioned, startTime });
         } catch (err) {
-            console.error(`Error executing command .${cmdName}:`, err);
-            await sock.sendMessage(from, { text: `❌ Error executing command: ${err.message}` });
+            console.error('❌ Error handling message:', err);
         }
     });
 }
 
 module.exports = { startBot };
-               
