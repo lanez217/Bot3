@@ -2,16 +2,12 @@ const axios = require('axios');
 const FormData = require('form-data');
 const Groq = require('groq-sdk');
 
-// Initialize Groq SDK with your existing Render Environment Variable
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
 
 const config = {
     botName: "LANEZ OS",
     antilink: {},
-    antibadword: {},
-    antidelete: {},
-    warnings: {},
-    poll: {}
+    warnings: {}
 };
 
 function getUptime(startTime) {
@@ -31,13 +27,8 @@ function getMenu(startTime) {
 │  Owner: LANEZ
 ╰───────────────⊷
 
-┌─⊷ *Free Bot*
-│ bot: most active
-│ Owner: LANEZ
-└───────────────⊷
-
 ╭──❏ *GROUP MANAGER* ❏
-│ • ban / kick <kick member>
+│ • kick <kick member>
 │ • promote <make admin>
 │ • demote <remove admin>
 │ • tagall <mention everyone>
@@ -75,7 +66,7 @@ function getMenu(startTime) {
 }
 
 const commands = [
-    // ====== MENU & SYSTEM ======
+    // MENU & SYSTEM
     {
         name: 'menu',
         aliases: ['help', 'commands'],
@@ -93,39 +84,50 @@ const commands = [
         }
     },
 
-    // ====== VIEWONCE CRACKER (VV / VV2) ======
+    // VIEWONCE CRACKER
     {
         name: 'vv2',
         aliases: ['vv'],
         exec: async ({ sock, from, msg, downloadMediaMessage }) => {
-            const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (!quoted) return sock.sendMessage(from, { text: '❌ Reply to a ViewOnce message!' });
+            try {
+                const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!quotedMsg) return sock.sendMessage(from, { text: '❌ Reply to a ViewOnce message!' });
 
-            const viewOnceMedia = quoted.viewOnceMessageV2?.message || quoted.viewOnceMessage?.message;
-            if (!viewOnceMedia) return sock.sendMessage(from, { text: '❌ Target message is not a ViewOnce file.' });
+                let targetMedia = quotedMsg.viewOnceMessageV2?.message || 
+                                  quotedMsg.viewOnceMessageV2Extension?.message || 
+                                  quotedMsg.viewOnceMessage?.message || 
+                                  quotedMsg;
 
-            const type = Object.keys(viewOnceMedia)[0];
-            const buffer = await downloadMediaMessage({ message: viewOnceMedia }, 'buffer', {});
+                const type = Object.keys(targetMedia)[0];
+                const buffer = await downloadMediaMessage({ message: targetMedia }, 'buffer', {});
 
-            if (type.includes('image')) {
-                return sock.sendMessage(from, { image: buffer, caption: '🔓 ViewOnce Unlocked' });
-            } else if (type.includes('video')) {
-                return sock.sendMessage(from, { video: buffer, caption: '🔓 ViewOnce Unlocked' });
+                if (type.includes('image')) {
+                    return sock.sendMessage(from, { image: buffer, caption: '🔓 ViewOnce Unlocked' });
+                } else if (type.includes('video')) {
+                    return sock.sendMessage(from, { video: buffer, caption: '🔓 ViewOnce Unlocked' });
+                } else if (type.includes('audio')) {
+                    return sock.sendMessage(from, { audio: buffer, mimetype: 'audio/mp4' });
+                } else {
+                    return sock.sendMessage(from, { text: '❌ Could not extract media.' });
+                }
+            } catch (err) {
+                console.error('VV error:', err.message);
+                return sock.sendMessage(from, { text: '❌ Failed to process ViewOnce file.' });
             }
         }
     },
 
-    // ====== AI COMMANDS ======
+    // AI COMMANDS
     {
         name: 'ai',
         aliases: ['groq', 'gpt', 'bot'],
         exec: async ({ sock, from, args }) => {
             const prompt = args.join(' ');
-            if (!prompt) return sock.sendMessage(from, { text: '❌ Please enter a prompt! Example: `.ai What is space?`' });
+            if (!prompt) return sock.sendMessage(from, { text: '❌ Provide a prompt!' });
 
             try {
                 if (!process.env.GROQ_API_KEY) {
-                    return sock.sendMessage(from, { text: '⚠️ GROQ_API_KEY missing in environment settings.' });
+                    return sock.sendMessage(from, { text: '⚠️ GROQ_API_KEY missing in environment variables.' });
                 }
 
                 const chatCompletion = await groq.chat.completions.create({
@@ -135,9 +137,8 @@ const commands = [
 
                 const responseText = chatCompletion.choices[0]?.message?.content || 'No response from AI.';
                 await sock.sendMessage(from, { text: `🤖 *LANEZ AI*:\n\n${responseText}` });
-
             } catch (err) {
-                console.error('Groq AI error:', err.message);
+                console.error('AI Error:', err.message);
                 await sock.sendMessage(from, { text: '❌ Failed to generate AI response.' });
             }
         }
@@ -147,7 +148,7 @@ const commands = [
         aliases: ['dalle', 'flux'],
         exec: async ({ sock, from, args }) => {
             const prompt = args.join(' ');
-            if (!prompt) return sock.sendMessage(from, { text: '❌ Provide an image description! Example: .imagine futuristic city' });
+            if (!prompt) return sock.sendMessage(from, { text: '❌ Provide an image description!' });
 
             await sock.sendMessage(from, { text: '🎨 Generating image...' });
             const imgUrl = `https://pollinations.ai/p/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}`;
@@ -155,25 +156,25 @@ const commands = [
         }
     },
 
-    // ====== DOWNLOADER & MEDIA ======
+    // DOWNLOADER & MEDIA
     {
         name: 'play',
         aliases: ['song', 'music'],
         exec: async ({ sock, from, args }) => {
             const query = args.join(' ');
-            if (!query) return sock.sendMessage(from, { text: '❌ Provide a song name! Example: `.play Burna Boy`' });
+            if (!query) return sock.sendMessage(from, { text: '❌ Provide a song name!' });
 
-            await sock.sendMessage(from, { text: `🎵 Searching and downloading: *${query}*...` });
+            await sock.sendMessage(from, { text: `🎵 Downloading: *${query}*...` });
 
             try {
-                const searchRes = await axios.get(`https://api.vyt.workers.dev/search?q=${encodeURIComponent(query)}`);
-                const video = searchRes.data?.results?.[0];
+                const res = await axios.get(`https://api.vyt.workers.dev/search?q=${encodeURIComponent(query)}`);
+                const video = res.data?.results?.[0];
                 if (!video) throw new Error('Not found');
 
-                const downloadRes = await axios.get(`https://api.dreaded.site/api/ytdl/video?url=${video.url}`);
-                const audioUrl = downloadRes.data?.result?.download?.audio || downloadRes.data?.result?.url;
+                const dlRes = await axios.get(`https://api.dreaded.site/api/ytdl/video?url=${video.url}`);
+                const audioUrl = dlRes.data?.result?.download?.audio || dlRes.data?.result?.url;
 
-                if (!audioUrl) throw new Error('Audio stream error');
+                if (!audioUrl) throw new Error('Audio URL failed');
 
                 return sock.sendMessage(from, {
                     audio: { url: audioUrl },
@@ -182,7 +183,7 @@ const commands = [
                 });
             } catch (err) {
                 console.error('Play error:', err.message);
-                return sock.sendMessage(from, { text: '❌ Failed to process YouTube audio.' });
+                return sock.sendMessage(from, { text: '❌ Failed to download audio stream.' });
             }
         }
     },
@@ -191,24 +192,24 @@ const commands = [
         aliases: ['ytmp4', 'mp4'],
         exec: async ({ sock, from, args }) => {
             const query = args.join(' ');
-            if (!query) return sock.sendMessage(from, { text: '❌ Provide a video query! Example: `.video anime edit`' });
+            if (!query) return sock.sendMessage(from, { text: '❌ Provide a video search term!' });
 
-            await sock.sendMessage(from, { text: `🎥 Downloading video for: *${query}*...` });
+            await sock.sendMessage(from, { text: `🎥 Downloading video: *${query}*...` });
 
             try {
-                const searchRes = await axios.get(`https://api.vyt.workers.dev/search?q=${encodeURIComponent(query)}`);
-                const video = searchRes.data?.results?.[0];
+                const res = await axios.get(`https://api.vyt.workers.dev/search?q=${encodeURIComponent(query)}`);
+                const video = res.data?.results?.[0];
                 if (!video) throw new Error('Not found');
 
-                const downloadRes = await axios.get(`https://api.dreaded.site/api/ytdl/video?url=${video.url}`);
-                const videoUrl = downloadRes.data?.result?.download?.video || downloadRes.data?.result?.url;
+                const dlRes = await axios.get(`https://api.dreaded.site/api/ytdl/video?url=${video.url}`);
+                const videoUrl = dlRes.data?.result?.download?.video || dlRes.data?.result?.url;
 
-                if (!videoUrl) throw new Error('Video stream error');
+                if (!videoUrl) throw new Error('Video URL failed');
 
                 return sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *${video.title}*` });
             } catch (err) {
                 console.error('Video error:', err.message);
-                return sock.sendMessage(from, { text: '❌ Error fetching video.' });
+                return sock.sendMessage(from, { text: '❌ Failed to download video stream.' });
             }
         }
     },
@@ -237,7 +238,7 @@ const commands = [
         exec: async ({ sock, from, msg, downloadMediaMessage }) => {
             const targetMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
             if (!targetMsg?.imageMessage && !targetMsg?.videoMessage) {
-                return sock.sendMessage(from, { text: '❌ Send or reply to an image/video with .sticker' });
+                return sock.sendMessage(from, { text: '❌ Reply to an image/video with .sticker' });
             }
             const buffer = await downloadMediaMessage({ message: targetMsg }, 'buffer', {});
             return sock.sendMessage(from, { sticker: buffer });
@@ -247,20 +248,20 @@ const commands = [
         name: 'toimg',
         exec: async ({ sock, from, msg, downloadMediaMessage }) => {
             const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (!quoted?.stickerMessage) return sock.sendMessage(from, { text: '❌ Reply to a sticker to convert to image!' });
+            if (!quoted?.stickerMessage) return sock.sendMessage(from, { text: '❌ Reply to a sticker!' });
 
             const buffer = await downloadMediaMessage({ message: quoted }, 'buffer', {});
             return sock.sendMessage(from, { image: buffer, caption: '🖼️ Converted from Sticker' });
         }
     },
 
-    // ====== UTILITY & TOOLS ======
+    // UTILITIES
     {
         name: 'ss',
         aliases: ['ssweb'],
         exec: async ({ sock, from, args }) => {
             let url = args[0];
-            if (!url) return sock.sendMessage(from, { text: '❌ Provide a website URL!' });
+            if (!url) return sock.sendMessage(from, { text: '❌ Provide a URL!' });
             if (!url.startsWith('http')) url = 'https://' + url;
 
             const ssUrl = `https://image.thum.io/get/width/1200/crop/800/${url}`;
@@ -272,7 +273,7 @@ const commands = [
         exec: async ({ sock, from, msg, downloadMediaMessage }) => {
             const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
             if (!quoted?.imageMessage && !quoted?.videoMessage) {
-                return sock.sendMessage(from, { text: '❌ Reply to an image or video to create a link!' });
+                return sock.sendMessage(from, { text: '❌ Reply to an image or video!' });
             }
 
             const buffer = await downloadMediaMessage({ message: quoted }, 'buffer', {});
@@ -284,7 +285,7 @@ const commands = [
                 const imgUrl = 'https://telegra.ph' + res.data[0].src;
                 return sock.sendMessage(from, { text: `🔗 *Media Link:* ${imgUrl}` });
             } catch (e) {
-                return sock.sendMessage(from, { text: '❌ Failed to upload media.' });
+                return sock.sendMessage(from, { text: '❌ Upload failed.' });
             }
         }
     },
@@ -304,7 +305,7 @@ const commands = [
         }
     },
 
-    // ====== SECURITY & MODERATION ======
+    // GROUP & MODERATION
     {
         name: 'antilink',
         exec: async ({ sock, from, args, isGroup }) => {
@@ -317,7 +318,7 @@ const commands = [
                 config.antilink[from] = false;
                 return sock.sendMessage(from, { text: '🛡️ Antilink disabled.' });
             }
-            return sock.sendMessage(from, { text: '❌ Usage: `.antilink on` or `.antilink off`' });
+            return sock.sendMessage(from, { text: ' Usage: `.antilink on` or `.antilink off`' });
         }
     },
     {
@@ -326,7 +327,7 @@ const commands = [
             if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only.' });
             const user = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                          msg.message?.extendedTextMessage?.contextInfo?.participant;
-            if (!user) return sock.sendMessage(from, { text: '❌ Mention or reply to a user to warn.' });
+            if (!user) return sock.sendMessage(from, { text: '❌ Mention or reply to a user.' });
 
             config.warnings[user] = (config.warnings[user] || 0) + 1;
             const count = config.warnings[user];
@@ -347,7 +348,7 @@ const commands = [
             if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only.' });
             const user = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                          msg.message?.extendedTextMessage?.contextInfo?.participant;
-            if (!user) return sock.sendMessage(from, { text: '❌ Tag or reply to a user to kick.' });
+            if (!user) return sock.sendMessage(from, { text: '❌ Mention or reply to a user.' });
 
             await sock.groupParticipantsUpdate(from, [user], 'remove');
             return sock.sendMessage(from, { text: '🚪 Member removed.' });
@@ -359,7 +360,7 @@ const commands = [
             if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only.' });
             const user = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                          msg.message?.extendedTextMessage?.contextInfo?.participant;
-            if (!user) return sock.sendMessage(from, { text: '❌ Tag or reply to a user.' });
+            if (!user) return sock.sendMessage(from, { text: '❌ Mention or reply to a user.' });
 
             await sock.groupParticipantsUpdate(from, [user], 'promote');
             return sock.sendMessage(from, { text: '👑 Promoted to Admin.' });
@@ -371,7 +372,7 @@ const commands = [
             if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only.' });
             const user = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                          msg.message?.extendedTextMessage?.contextInfo?.participant;
-            if (!user) return sock.sendMessage(from, { text: '❌ Tag or reply to a user.' });
+            if (!user) return sock.sendMessage(from, { text: '❌ Mention or reply to a user.' });
 
             await sock.groupParticipantsUpdate(from, [user], 'demote');
             return sock.sendMessage(from, { text: '📉 Demoted from Admin.' });
@@ -406,4 +407,4 @@ const commands = [
 ];
 
 module.exports = { commands, config };
-                
+                    
