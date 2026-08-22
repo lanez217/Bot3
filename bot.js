@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const COMMANDS = require('./commands');
 
 const startTime = Date.now();
@@ -31,7 +31,7 @@ async function startBot(io = null, phoneNumber = null) {
                     if (io) io.emit('pairing_code', code);
                 } catch (err) {
                     console.error('Pairing error:', err);
-                    if (io) io.emit('pairing_error', 'Failed to generate code.');
+                    if (io) io.emit('pairing_error', 'Failed to generate pairing code.');
                 }
             }, 2000);
         }
@@ -87,7 +87,8 @@ async function startBot(io = null, phoneNumber = null) {
                     msg, 
                     sender, 
                     isGroup, 
-                    startTime 
+                    startTime,
+                    downloadMediaMessage 
                 });
 
             } catch (err) {
@@ -101,3 +102,4 @@ async function startBot(io = null, phoneNumber = null) {
 }
 
 module.exports = { startBot };
+                
