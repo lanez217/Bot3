@@ -1,12 +1,17 @@
 {
-  "name": "lanez-bot",
-  "version": "1.0.0",
+  "name": "lanez-os-bot",
+  "version": "2.0.0",
+  "description": "WhatsApp Bot powered by Baileys and Express",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.6.0",
-    "express": "^4.18.2",
-    "socket.io": "^4.7.2",
-    "axios": "^1.6.0",
-    "form-data": "^4.0.0"
+    "@whiskeysockets/baileys": "^6.7.13",
+    "axios": "^1.7.9",
+    "express": "^4.21.2",
+    "form-data": "^4.0.0",
+    "groq-sdk": "^0.15.0",
+    "socket.io": "^4.8.1"
   }
 }
