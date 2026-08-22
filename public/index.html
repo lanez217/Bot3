@@ -1,4 +1,4 @@
-lanez bruh<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,11 +7,11 @@ lanez bruh<!DOCTYPE html>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { font-family: monospace; background: #0f172a; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #1e293b; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #22c55e; border: none; color: #fff; font-weight: bold; border-radius: 4px; cursor: pointer; }
-        .code { font-size: 24px; font-weight: bold; color: #4ade80; letter-spacing: 4px; margin-top: 15px; }
-        .status { margin-top: 10px; color: #94a3b8; font-size: 12px; }
+        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; }
+        input { width: 100%; padding: 12px; margin: 12px 0; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; text-align: center; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #22c55e; border: none; color: #fff; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .code { font-size: 26px; font-weight: bold; color: #4ade80; letter-spacing: 4px; margin-top: 15px; }
+        .status { margin-top: 12px; color: #94a3b8; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -32,7 +32,7 @@ lanez bruh<!DOCTYPE html>
 
         socket.on('pairing_code', (code) => {
             document.getElementById('codeDisplay').innerText = code;
-            document.getElementById('statusDisplay').innerText = "Status: Enter this code in WhatsApp!";
+            document.getElementById('statusDisplay').innerText = "Status: Enter code in WhatsApp!";
         });
 
         socket.on('pairing_error', (err) => {
@@ -49,4 +49,3 @@ lanez bruh<!DOCTYPE html>
     </script>
 </body>
 </html>
-    
