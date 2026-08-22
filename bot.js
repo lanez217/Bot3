@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const COMMANDS = require('./commands');
 
 const startTime = Date.now();
@@ -22,7 +22,6 @@ async function startBot(io = null, phoneNumber = null) {
         sockInstance = sock;
         sock.ev.on('creds.update', saveCreds);
 
-        // Pairing Code Handler
         if (phoneNumber && !sock.authState.creds.registered) {
             setTimeout(async () => {
                 try {
@@ -32,23 +31,21 @@ async function startBot(io = null, phoneNumber = null) {
                     if (io) io.emit('pairing_code', code);
                 } catch (err) {
                     console.error('Pairing error:', err);
-                    if (io) io.emit('pairing_error', 'Failed to generate code. Try again.');
+                    if (io) io.emit('pairing_error', 'Failed to generate code.');
                 }
             }, 2000);
         }
 
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
-
             if (connection === 'open') {
                 console.log('✅ Connected to WhatsApp!');
                 if (io) io.emit('status', 'Connected');
             } else if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-                console.log(`⚠️ Disconnected (${statusCode}). Reconnecting: ${!isLoggedOut}`);
+                console.log(`⚠️ Disconnected (${statusCode}). Reconnecting...`);
                 if (io) io.emit('status', 'Disconnected');
-
                 if (!isLoggedOut) {
                     setTimeout(() => startBot(io, null), 3000);
                 }
@@ -72,6 +69,8 @@ async function startBot(io = null, phoneNumber = null) {
                 const prefix = '.';
                 if (!body.startsWith(prefix)) return;
 
+                console.log(`📩 Command received: ${body} from ${from}`);
+
                 const args = body.slice(prefix.length).trim().split(/ +/);
                 const cmdName = args.shift().toLowerCase();
 
@@ -88,12 +87,11 @@ async function startBot(io = null, phoneNumber = null) {
                     msg, 
                     sender, 
                     isGroup, 
-                    startTime, 
-                    downloadMediaMessage 
+                    startTime 
                 });
 
             } catch (err) {
-                console.error('Message handler error:', err);
+                console.error('Message handler error:', err.message);
             }
         });
 
