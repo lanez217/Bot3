@@ -2,9 +2,8 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLat
 const COMMANDS = require('./commands');
 
 const startTime = Date.now();
-let sockInstance = null;
 
-async function startBot(io = null, phoneNumber = null) {
+async function startBot(phoneNumber = null, callback = null) {
     try {
         const { state, saveCreds } = await useMultiFileAuthState('auth_info_lanez');
         const { version } = await fetchLatestBaileysVersion();
@@ -19,19 +18,19 @@ async function startBot(io = null, phoneNumber = null) {
             syncFullHistory: false
         });
 
-        sockInstance = sock;
         sock.ev.on('creds.update', saveCreds);
 
+        // Generate pairing code if requested
         if (phoneNumber && !sock.authState.creds.registered) {
             setTimeout(async () => {
                 try {
                     const cleanNum = phoneNumber.replace(/[^0-9]/g, '');
                     const code = await sock.requestPairingCode(cleanNum);
                     console.log(`🔑 Generated Pairing Code: ${code}`);
-                    if (io) io.emit('pairing_code', code);
+                    if (callback) callback(code);
                 } catch (err) {
                     console.error('Pairing error:', err);
-                    if (io) io.emit('pairing_error', 'Failed to generate pairing code.');
+                    if (callback) callback(null);
                 }
             }, 2000);
         }
@@ -40,14 +39,12 @@ async function startBot(io = null, phoneNumber = null) {
             const { connection, lastDisconnect } = update;
             if (connection === 'open') {
                 console.log('✅ Connected to WhatsApp!');
-                if (io) io.emit('status', 'Connected');
             } else if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
                 console.log(`⚠️ Disconnected (${statusCode}). Reconnecting...`);
-                if (io) io.emit('status', 'Disconnected');
                 if (!isLoggedOut) {
-                    setTimeout(() => startBot(io, null), 3000);
+                    setTimeout(() => startBot(), 3000);
                 }
             }
         });
@@ -69,7 +66,7 @@ async function startBot(io = null, phoneNumber = null) {
                 const prefix = '.';
                 if (!body.startsWith(prefix)) return;
 
-                console.log(`📩 Command received: ${body} from ${from}`);
+                console.log(`📩 Command: ${body} from ${from}`);
 
                 const args = body.slice(prefix.length).trim().split(/ +/);
                 const cmdName = args.shift().toLowerCase();
@@ -102,4 +99,3 @@ async function startBot(io = null, phoneNumber = null) {
 }
 
 module.exports = { startBot };
-                
