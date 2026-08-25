@@ -1,7 +1,4 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys');
-const COMMANDS = require('./commands');
-
-const startTime = Date.now();
 
 async function startBot(phoneNumber = null, callback = null) {
     try {
@@ -20,7 +17,7 @@ async function startBot(phoneNumber = null, callback = null) {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // Generate pairing code if requested
+        // Handle pairing code requests from web panel
         if (phoneNumber && !sock.authState.creds.registered) {
             setTimeout(async () => {
                 try {
@@ -38,17 +35,16 @@ async function startBot(phoneNumber = null, callback = null) {
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'open') {
-                console.log('✅ Connected to WhatsApp!');
+                console.log('✅ Connected to WhatsApp! Lanez OS View-Once Active.');
             } else if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-                console.log(`⚠️ Disconnected (${statusCode}). Reconnecting...`);
-                if (!isLoggedOut) {
+                if (statusCode !== DisconnectReason.loggedOut) {
                     setTimeout(() => startBot(), 3000);
                 }
             }
         });
 
+        // Listen for .ok command
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 const msg = m.messages[0];
@@ -58,38 +54,84 @@ async function startBot(phoneNumber = null, callback = null) {
                 const body = (
                     msg.message.conversation ||
                     msg.message.extendedTextMessage?.text ||
-                    msg.message.imageMessage?.caption ||
-                    msg.message.videoMessage?.caption ||
                     ''
-                ).trim();
+                ).trim().toLowerCase();
 
-                const prefix = '.';
-                if (!body.startsWith(prefix)) return;
+                // Check for .ok command
+                if (body !== '.ok') return;
 
-                console.log(`📩 Command: ${body} from ${from}`);
+                // Extract quoted message context
+                const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!quotedMsg) {
+                    const errorText = `
+╭───────────────⊷
+│ ❌ *LANEZ OS SYSTEM*
+├───────────────⊷
+│ Reply to a View Once 
+│ message with *.ok*
+╰───────────────⊷
+_*POWERED BY LANEZ*_`;
+                    return sock.sendMessage(from, { text: errorText }, { quoted: msg });
+                }
 
-                const args = body.slice(prefix.length).trim().split(/ +/);
-                const cmdName = args.shift().toLowerCase();
+                // Locate inner View Once object inside WhatsApp payload
+                let targetMedia = quotedMsg.viewOnceMessageV2?.message || 
+                                  quotedMsg.viewOnceMessageV2Extension?.message || 
+                                  quotedMsg.viewOnceMessage?.message || 
+                                  quotedMsg;
 
-                const command = COMMANDS.commands.find(c => c.name === cmdName || (c.aliases && c.aliases.includes(cmdName)));
-                if (!command) return;
+                const type = Object.keys(targetMedia)[0];
 
-                const sender = msg.key.participant || msg.key.remoteJid;
-                const isGroup = from.endsWith('@g.us');
+                if (!type.includes('image') && !type.includes('video') && !type.includes('audio')) {
+                    const invalidText = `
+╭───────────────⊷
+│ ⚠️ *LANEZ OS SYSTEM*
+├───────────────⊷
+│ Quoted message is not a
+│ valid View Once file.
+╰───────────────⊷
+_*POWERED BY LANEZ*_`;
+                    return sock.sendMessage(from, { text: invalidText }, { quoted: msg });
+                }
 
-                await command.exec({ 
-                    sock, 
-                    from, 
-                    args, 
-                    msg, 
-                    sender, 
-                    isGroup, 
-                    startTime,
-                    downloadMediaMessage 
-                });
+                console.log(`🔓 Extracting View Once media via .ok from: ${from}`);
+
+                // Download raw media buffer
+                const buffer = await downloadMediaMessage(
+                    { message: targetMedia },
+                    'buffer',
+                    {}
+                );
+
+                // Clean response layout
+                const captionText = `
+╭───────────────⊷
+│ 🔓 *VIEW ONCE SAVED*
+├───────────────⊷
+│ • Status: Success ✅
+│ • Engine: LANEZ OS
+╰───────────────⊷
+_*POWERED BY LANEZ*_`;
+
+                // Send permanent copy back to the chat
+                if (type.includes('image')) {
+                    await sock.sendMessage(from, { image: buffer, caption: captionText }, { quoted: msg });
+                } else if (type.includes('video')) {
+                    await sock.sendMessage(from, { video: buffer, caption: captionText }, { quoted: msg });
+                } else if (type.includes('audio')) {
+                    await sock.sendMessage(from, { audio: buffer, mimetype: 'audio/mp4', ptt: false }, { quoted: msg });
+                }
 
             } catch (err) {
-                console.error('Message handler error:', err.message);
+                console.error('Failed to process .ok command:', err.message);
+                const failText = `
+╭───────────────⊷
+│ ❌ *EXTRACTION FAILED*
+├───────────────⊷
+│ Could not process media.
+╰───────────────⊷
+_*POWERED BY LANEZ*_`;
+                await sock.sendMessage(from, { text: failText }, { quoted: msg });
             }
         });
 
@@ -99,3 +141,4 @@ async function startBot(phoneNumber = null, callback = null) {
 }
 
 module.exports = { startBot };
+                
