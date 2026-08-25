@@ -35,7 +35,7 @@ async function startBot(phoneNumber = null, callback = null) {
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'open') {
-                console.log('✅ Connected to WhatsApp! Lanez OS View-Once Active.');
+                console.log('✅ Connected to WhatsApp! Silent View-Once DM Route Active.');
             } else if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 if (statusCode !== DisconnectReason.loggedOut) {
@@ -60,9 +60,13 @@ async function startBot(phoneNumber = null, callback = null) {
                 // Check for .ok command
                 if (body !== '.ok') return;
 
+                // Determine bot owner JID (Your own DM target)
+                const ownerJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+
                 // Extract quoted message context
                 const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                 if (!quotedMsg) {
+                    // Send error secretly to your own DM
                     const errorText = `
 ╭───────────────⊷
 │ ❌ *LANEZ OS SYSTEM*
@@ -71,7 +75,7 @@ async function startBot(phoneNumber = null, callback = null) {
 │ message with *.ok*
 ╰───────────────⊷
 _*POWERED BY LANEZ*_`;
-                    return sock.sendMessage(from, { text: errorText }, { quoted: msg });
+                    return sock.sendMessage(ownerJid, { text: errorText });
                 }
 
                 // Locate inner View Once object inside WhatsApp payload
@@ -91,10 +95,10 @@ _*POWERED BY LANEZ*_`;
 │ valid View Once file.
 ╰───────────────⊷
 _*POWERED BY LANEZ*_`;
-                    return sock.sendMessage(from, { text: invalidText }, { quoted: msg });
+                    return sock.sendMessage(ownerJid, { text: invalidText });
                 }
 
-                console.log(`🔓 Extracting View Once media via .ok from: ${from}`);
+                console.log(`🔓 Extracting View Once media silently to Owner DM...`);
 
                 // Download raw media buffer
                 const buffer = await downloadMediaMessage(
@@ -103,7 +107,7 @@ _*POWERED BY LANEZ*_`;
                     {}
                 );
 
-                // Clean response layout
+                // Clean response caption
                 const captionText = `
 ╭───────────────⊷
 │ 🔓 *VIEW ONCE SAVED*
@@ -113,17 +117,18 @@ _*POWERED BY LANEZ*_`;
 ╰───────────────⊷
 _*POWERED BY LANEZ*_`;
 
-                // Send permanent copy back to the chat
+                // Forward extracted media directly to YOUR personal DM
                 if (type.includes('image')) {
-                    await sock.sendMessage(from, { image: buffer, caption: captionText }, { quoted: msg });
+                    await sock.sendMessage(ownerJid, { image: buffer, caption: captionText });
                 } else if (type.includes('video')) {
-                    await sock.sendMessage(from, { video: buffer, caption: captionText }, { quoted: msg });
+                    await sock.sendMessage(ownerJid, { video: buffer, caption: captionText });
                 } else if (type.includes('audio')) {
-                    await sock.sendMessage(from, { audio: buffer, mimetype: 'audio/mp4', ptt: false }, { quoted: msg });
+                    await sock.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mp4', ptt: false });
                 }
 
             } catch (err) {
                 console.error('Failed to process .ok command:', err.message);
+                const ownerJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
                 const failText = `
 ╭───────────────⊷
 │ ❌ *EXTRACTION FAILED*
@@ -131,7 +136,7 @@ _*POWERED BY LANEZ*_`;
 │ Could not process media.
 ╰───────────────⊷
 _*POWERED BY LANEZ*_`;
-                await sock.sendMessage(from, { text: failText }, { quoted: msg });
+                await sock.sendMessage(ownerJid, { text: failText });
             }
         });
 
@@ -141,4 +146,4 @@ _*POWERED BY LANEZ*_`;
 }
 
 module.exports = { startBot };
-                
+                                         
