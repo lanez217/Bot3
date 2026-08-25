@@ -1,131 +1,184 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LANEZ OS - Pairing</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>View Once unlock 🔓</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif;-webkit-tap-highlight-color:transparent}
-body{background:#07070B;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
-body.shake{animation:shake 0.4s ease-in-out}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
-body::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,#8A2BE2 0%,transparent 70%);top:-200px;left:-200px;filter:blur(80px);opacity:0.5;animation:float 6s infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(30px)}}
-.card{width:95%;max-width:420px;background:rgba(255,255,255,0.05);backdrop-filter:blur(25px);border:1px solid rgba(255,255,255,0.1);border-radius:28px;padding:30px;z-index:2;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+* { font-family:'Inter',sans-serif; box-sizing:border-box; }
+body {
+  background:#050a0f;
+  background: radial-gradient(circle at center, #1a2f35 0%, #0b141a 55%, #050a0f 100%);
+  color:#e9edef; margin:0; min-height:100vh;
+  display:flex; justify-content:center; align-items:center;
+  overflow:hidden;
+}
+.flash-overlay {
+  position:fixed; inset:0; background:white; opacity:0;
+  pointer-events:none; z-index:99;
+}
+.flash-overlay.active { animation: flash .6s ease-out; }
+@keyframes flash {
+  0%{opacity:0} 15%{opacity:1} 100%{opacity:0}
+}
 
-/* SCANNER RUN EFFECT */
-.scanner{position:fixed;top:0;left:0;width:100%;height:4px;background:linear-gradient(90deg,transparent,#8A2BE2,#FF00FF,transparent);box-shadow:0 0 20px #8A2BE2, 0 0 40px #FF00FF;z-index:100;display:none;animation:scanMove 1.8s ease-in-out}
-@keyframes scanMove{0%{top:0}50%{top:100%}100%{top:0}}
-.scan-overlay{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(138,43,226,0.03) 2px,rgba(138,43,226,0.03) 4px);z-index:99;display:none;pointer-events:none}
-.scan-overlay.active{display:block;animation:flicker 0.1s infinite}
-@keyframes flicker{0%{opacity:0.5}50%{opacity:1}}
+.card {
+  position:relative; z-index:2;
+  background: rgba(22,33,40,.9);
+  backdrop-filter: blur(24px);
+  width:92%; max-width:400px;
+  padding:32px; border-radius:28px;
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 30px 80px rgba(0,0,0,.7);
+  text-align:center;
+  animation: slideUp .8s cubic-bezier(.16,1,.3,1);
+}
+@keyframes slideUp { from{opacity:0; transform:translateY(50px)} to{opacity:1; transform:translateY(0)} }
 
-.logo-wrap{perspective:1000px;width:70px;height:70px;margin:0 auto 15px}
-.logo{width:100%;height:100%;background:linear-gradient(135deg,#8A2BE2,#FF00FF);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 10px 30px rgba(138,43,226,0.5);cursor:pointer;transform-style:preserve-3d;transition:transform 0.7s cubic-bezier(0.68,-0.55,0.265,1.55)}
-.logo.flip{transform:rotateY(360deg) scale(1.15)}
-h1{text-align:center;font-weight:800;letter-spacing:1px;font-size:26px}
-.subtitle{text-align:center;opacity:0.6;font-size:13px;margin:5px 0 20px}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}
-.stat-wrap{perspective:1000px;cursor:pointer}
-.stat{position:relative;background:rgba(255,255,255,0.06);border-radius:14px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.05);transform-style:preserve-3d;transition:transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275);height:58px}
-.stat.flipped{transform:rotateY(180deg)}
-.stat-front,.stat-back{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;backface-visibility:hidden;border-radius:14px}
-.stat-back{transform:rotateY(180deg);background:linear-gradient(135deg,#8A2BE2,#FF00FF);font-size:11px;font-weight:700}
-.stat span{font-size:11px;opacity:0.5} .stat b{font-size:13px;color:#C084FC}
-.stat.flipped b{color:#fff}
-input{width:100%;padding:16px 18px;border-radius:14px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:#fff;outline:none;font-size:15px;margin-top:10px;transition:0.3s}
-input:focus{border-color:#8A2BE2;box-shadow:0 0 20px rgba(138,43,226,0.3)}
-.btn{width:100%;padding:16px;margin-top:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#8A2BE2,#FF00FF);color:#fff;font-weight:700;font-size:16px;cursor:pointer;transition:all 0.4s cubic-bezier(0.68,-0.55,0.265,1.55);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn.generating{animation:btnPulse 1s infinite;pointer-events:none}
-@keyframes btnPulse{0%,100%{transform:scale(1)}50%{transform:scale(0.98)}}
-.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;display:none}
-.btn.generating .spinner{display:block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.progress-wrap{height:4px;background:rgba(255,255,255,0.1);border-radius:10px;margin-top:12px;overflow:hidden;display:none}
-.progress{height:100%;width:0%;background:linear-gradient(90deg,#8A2BE2,#FF00FF);transition:width 0.1s}
-.codeBox{margin-top:20px;background:#000;border-radius:14px;padding:18px;text-align:center;border:1px dashed #8A2BE2;display:none}
-.codeBox.show{display:block;animation:pop 0.5s cubic-bezier(0.68,-0.55,0.265,1.55)}
-@keyframes pop{0%{transform:scale(0.5) rotateX(-90deg);opacity:0}100%{transform:scale(1) rotateX(0);opacity:1}}
-.code{font-size:28px;letter-spacing:6px;font-weight:800;color:#FF00FF;cursor:pointer}
-.footer{text-align:center;margin-top:22px;font-size:11px;opacity:0.4;letter-spacing:2px}
+.lens {
+  width:72px; height:72px; margin:0 auto 12px;
+  background: radial-gradient(circle at 30% 30%, #3a4d55, #111b21);
+  border-radius:50%; border:3px solid #00a884;
+  display:grid; place-items:center; font-size:32px;
+  box-shadow:0 0 0 8px rgba(0,168,132,.12), 0 0 40px rgba(0,168,132,.3);
+  animation: lensPulse 2s infinite;
+}
+@keyframes lensPulse { 0%,100%{box-shadow:0 0 0 8px rgba(0,168,132,.12), 0 0 40px rgba(0,168,132,.3)} 50%{box-shadow:0 0 0 14px rgba(0,168,132,.08), 0 0 60px rgba(0,168,132,.5)} }
+
+h2 { margin:8px 0 4px; font-weight:800; font-size:22px; letter-spacing:-0.5px; }
+.sub { color:#8696a0; font-size:12px; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; }
+
+.stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:22px; }
+.stat { background:#0d171d; border-radius:14px; padding:12px 6px; border:1px solid rgba(255,255,255,.05); }
+.stat b { display:block; font-size:14px; color:#00a884; }
+.stat span { font-size:10px; color:#5a6b75; text-transform:uppercase; letter-spacing:1px; }
+
+input { width:100%; background:#0d171d; border:1px solid rgba(255,255,255,.08); padding:16px; border-radius:16px; color:white; font-size:15px; outline:none; transition:.3s; }
+input:focus { border-color:#00a884; box-shadow:0 0 0 4px rgba(0,168,132,.15); }
+
+button { width:100%; margin-top:14px; background:#00a884; border:none; padding:16px; border-radius:16px; color:white; font-weight:800; font-size:15px; cursor:pointer; transition:.2s; position:relative; overflow:hidden; }
+button::before { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent); transform:translateX(-100%); transition:.6s; }
+button:hover::before { transform:translateX(100%); }
+button:hover { transform:translateY(-2px); box-shadow:0 12px 24px rgba(0,168,132,.4); }
+button:active { transform:scale(.97); }
+
+.code-box { margin-top:18px; background:#050a0f; padding:22px; border-radius:16px; font-size:28px; letter-spacing:6px; font-weight:800; display:none; border:1px dashed #00a884; color:#00a884; cursor:pointer; }
+.shutter { animation: shutter .5s cubic-bezier(.16,1,.3,1); }
+@keyframes shutter { 0%{transform:scale(.5) rotate(-5deg); opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1); opacity:1} }
+
+.footer { margin-top:24px; font-size:11px; color:#4a5a65; line-height:1.6; }
+.footer b { color:#8aa0ad; }
 </style>
 </head>
 <body>
-<div class="scanner" id="scanner"></div>
-<div class="scan-overlay" id="overlay"></div>
+<div id="flash" class="flash-overlay"></div>
 
 <div class="card">
-    <div class="logo-wrap" onclick="flipLogo(this)"><div class="logo" id="logo">⚡</div></div>
-    <h1>LANEZ OS PRO</h1>
-    <p class="subtitle">Elite WhatsApp Pairing System</p>
-    <div class="stats">
-        <div class="stat-wrap" onclick="flipCard(this)"><div class="stat"><div class="stat-front"><span>STATUS</span><b id="status">Online 🟢</b></div><div class="stat-back">SERVER ACTIVE</div></div></div>
-        <div class="stat-wrap" onclick="flipCard(this)"><div class="stat"><div class="stat-front"><span>UPTIME</span><b id="uptime">0h 0m 0s</b></div><div class="stat-back">LANEZ OS V2</div></div></div>
-        <div class="stat-wrap" onclick="flipCard(this)"><div class="stat"><div class="stat-front"><span>DATE</span><b id="date">--</b></div><div class="stat-back" id="season">WINTER ❄️</div></div></div>
-        <div class="stat-wrap" onclick="flipCard(this)"><div class="stat"><div class="stat-front"><span>TIME</span><b id="time">--</b></div><div class="stat-back">GHANA 🇬🇭</div></div></div>
-    </div>
-    <input id="num" placeholder="Enter Number e.g 23359..." type="number">
-    <button class="btn" id="genBtn" onclick="pair()"><div class="spinner"></div><span id="btnText">GENERATE PAIR CODE</span></button>
-    <div class="progress-wrap" id="progWrap"><div class="progress" id="prog"></div></div>
-    <div id="box" class="codeBox">
-        <span style="font-size:12px;opacity:0.6">YOUR PAIR CODE - TAP TO COPY</span>
-        <div class="code" id="code" onclick="copyCode()">----</div>
-        <p style="font-size:11px;margin-top:8px;opacity:0.6">WhatsApp > Linked Devices > Link with phone number</p>
-    </div>
-    <div class="footer">POWERED BY LANEZ © 2026</div>
+  <div class="lens">📸</div>
+  <h2>View Once unlock 🔓</h2>
+  <div class="sub">Secure Pairing • Encrypted</div>
+
+  <div class="stats">
+    <div class="stat"><b id="servers">--</b><span>Nodes</span></div>
+    <div class="stat"><b id="uptime">--</b><span>Uptime</span></div>
+    <div class="stat"><b id="speed">--</b><span>Ping</span></div>
+  </div>
+
+  <input id="num" placeholder="e.g. 23359..." type="number" />
+  <button id="btn" onclick="getCode()">Unlock Pair Code</button>
+  <div id="code" class="code-box" onclick="copyCode()"></div>
+
+  <div class="footer">
+    Crafted with 🖤 by <b>Lanez XMD</b><br>
+    © 2026 Lanez Team — All Rights Reserved
+  </div>
 </div>
 
+<audio id="shutterSound" preload="auto">
+  <source src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_d1718ab41b.mp3" type="audio/mpeg">
+</audio>
+
 <script>
-function flipLogo(el){let l=el.querySelector('.logo');l.classList.remove('flip');void l.offsetWidth;l.classList.add('flip');if(navigator.vibrate)navigator.vibrate(50)}
-function flipCard(w){w.querySelector('.stat').classList.toggle('flipped');if(navigator.vibrate)navigator.vibrate(30)}
-async function updateInfo(){
-    try{let r=await fetch('/api/uptime').then(res=>res.json());document.getElementById('uptime').innerText=r.uptime}catch{}
-    setInterval(async()=>{try{let r=await fetch('/api/uptime').then(res=>res.json());document.getElementById('uptime').innerText=r.uptime}catch{}},1000);
-    setInterval(()=>{let n=new Date();document.getElementById('date').innerText=n.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});document.getElementById('time').innerText=n.toLocaleTimeString();let m=n.getMonth();document.getElementById('season').innerText=m<2||m==11?'WINTER ❄️':m<5?'SPRING 🌸':m<8?'SUMMER ☀️':'AUTUMN 🍂'},1000);
+async function loadStats(){
+  try{
+    const startTime = performance.now();
+    const r = await fetch('/api/stats').then(x=>x.json()).catch(()=>null);
+    const latency = Math.round(performance.now() - startTime);
+    
+    if(r){
+      document.getElementById('servers').innerText = r.servers;
+      document.getElementById('uptime').innerText = r.uptime;
+      document.getElementById('speed').innerText = latency + 'ms';
+    } else {
+      document.getElementById('servers').innerText = 'Offline';
+      document.getElementById('uptime').innerText = '0m';
+      document.getElementById('speed').innerText = '--';
+    }
+  }catch{}
 }
-updateInfo();
 
-function runScreenEffect(){
-    document.body.classList.add('shake');
-    document.getElementById('scanner').style.display='block';
-    document.getElementById('overlay').classList.add('active');
-    document.getElementById('progWrap').style.display='block';
-    let p=0;
-    let interval=setInterval(()=>{p+=Math.random()*15;if(p>100)p=100;document.getElementById('prog').style.width=p+'%';if(p>=100)clearInterval(interval)},120);
-    setTimeout(()=>{document.body.classList.remove('shake');document.getElementById('scanner').style.display='none';document.getElementById('overlay').classList.remove('active')},1800);
+function triggerFlash(){
+  const flash = document.getElementById('flash');
+  const sound = document.getElementById('shutterSound');
+  flash.classList.remove('active');
+  void flash.offsetWidth;
+  flash.classList.add('active');
+  sound.currentTime = 0;
+  sound.play().catch(()=>{});
+  if(navigator.vibrate) navigator.vibrate(80);
 }
 
-async function pair(){
-    let number=document.getElementById('num').value;
-    if(!number) return alert('Enter number');
-    let btn=document.getElementById('genBtn'),txt=document.getElementById('btnText');
-    btn.classList.add('generating');txt.innerText='GENERATING...';
-    runScreenEffect();
+async function getCode(){
+  const num = document.getElementById('num').value;
+  const codeEl = document.getElementById('code');
+  const btn = document.getElementById('btn');
+  if(!num) return alert('Please enter your phone number');
 
-    await new Promise(r=>setTimeout(r,1900));
+  triggerFlash();
+  btn.innerText = 'Capturing...';
+  btn.disabled = true;
 
-    try{
-        let res=await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number})}).then(r=>r.json());
-        btn.classList.remove('generating');txt.innerText='GENERATE PAIR CODE';document.getElementById('progWrap').style.display='none';document.getElementById('prog').style.width='0%';
-        if(res.code){
-            let box=document.getElementById('box');box.classList.remove('show');void box.offsetWidth;box.classList.add('show');box.style.display='block';
-            document.getElementById('code').innerText=res.code;
-            navigator.clipboard.writeText(res.code.replace(/-/g,''));
-            txt.innerText='COPIED TO CLIPBOARD ✅';
-            setTimeout(()=>txt.innerText='GENERATE PAIR CODE',2000);
-            if(navigator.vibrate)navigator.vibrate([100,50,200]);
-        }else alert(res.error);
-    }catch(e){btn.classList.remove('generating');txt.innerText='GENERATE PAIR CODE';alert('Error, try again')}
+  try{
+    const resp = await fetch('/pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ number: num })
+    }).then(r => r.json());
+
+    if(resp.code) {
+      codeEl.innerText = resp.code;
+      codeEl.style.display = 'block';
+      codeEl.classList.remove('shutter');
+      void codeEl.offsetWidth;
+      codeEl.classList.add('shutter');
+      
+      navigator.clipboard.writeText(resp.code.replace(/-/g, ''));
+      btn.innerText = 'COPIED TO CLIPBOARD ✅';
+      setTimeout(() => { btn.innerText = 'Unlock Pair Code'; btn.disabled = false; }, 3000);
+    } else {
+      alert(resp.error || 'Failed to get code');
+      btn.innerText = 'Unlock Pair Code';
+      btn.disabled = false;
+    }
+  }catch(err){
+    alert('Server connection error. Please try again.');
+    btn.innerText = 'Unlock Pair Code';
+    btn.disabled = false;
+  }
 }
 
 function copyCode(){
-    let c=document.getElementById('code').innerText.replace(/-/g,'');
-    navigator.clipboard.writeText(c);
-    let orig=document.getElementById('code').innerText;
-    document.getElementById('code').innerText='COPIED!';
-    setTimeout(()=>document.getElementById('code').innerText=orig,1000);
-    if(navigator.vibrate)navigator.vibrate(50);
+  const codeText = document.getElementById('code').innerText.replace(/-/g, '');
+  if(!codeText) return;
+  navigator.clipboard.writeText(codeText);
+  const orig = document.getElementById('code').innerText;
+  document.getElementById('code').innerText = 'COPIED!';
+  setTimeout(() => document.getElementById('code').innerText = orig, 1000);
+  if(navigator.vibrate) navigator.vibrate(50);
 }
+
+loadStats();
+setInterval(loadStats, 4000);
 </script>
 </body>
 </html>
