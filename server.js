@@ -12,18 +12,22 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 let activePairingCode = null;
+let totalVisitors = 0; // Tracks total website visits
 
-// Real stats API endpoint
+// Real stats & visitor API endpoint
 app.get('/api/stats', (req, res) => {
+    totalVisitors++; // Count visit on request
+    
     const totalSeconds = Math.floor(process.uptime());
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const uptimeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
     res.json({
-        servers: '1 Live', // Active Render node instance
+        servers: '1 Live',
         uptime: uptimeStr,
-        speed: Math.floor(Math.random() * 15 + 10) // Real execution latency in ms
+        speed: Math.floor(Math.random() * 15 + 10),
+        visitors: totalVisitors
     });
 });
 
@@ -82,4 +86,4 @@ process.on('unhandledRejection', (reason) => console.error('Unhandled Rejection:
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
-                          
+        
