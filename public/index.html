@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lanez View Once Unlock 🔓</title>
 
-<!-- Open Graph Meta Tags for WhatsApp Link Sharing -->
+<!-- Open Graph Meta Tags for WhatsApp & Social Previews -->
 <meta property="og:title" content="Lanez XMD — View Once Unlock & Pairing Portal">
 <meta property="og:description" content="Unlock View Once media securely and connect your device instantly with Lanez OS.">
 <meta property="og:type" content="website">
@@ -111,6 +111,16 @@ button:active{transform:scale(.97)}
 <script>
 const $ = id => document.getElementById(id);
 
+// Record visit ONCE per browser load
+async function recordVisit(){
+  try {
+    const r = await fetch('/api/visit').then(x=>x.json()).catch(()=>null);
+    if(r && r.visitors !== undefined){
+      $('visitors').innerText = r.visitors;
+    }
+  } catch(e) {}
+}
+
 async function loadStats(){
   try{
     const startTime = performance.now();
@@ -121,12 +131,13 @@ async function loadStats(){
       $('servers').innerText = r.servers;
       $('uptime').innerText = r.uptime;
       $('speed').innerText = latency + 'ms';
-      $('visitors').innerText = r.visitors || 0;
+      if($('visitors').innerText === '--') {
+        $('visitors').innerText = r.visitors || 0;
+      }
     } else {
       $('servers').innerText = 'Offline';
       $('uptime').innerText = '0m';
       $('speed').innerText = '--';
-      $('visitors').innerText = '--';
     }
   }catch{}
 }
@@ -208,8 +219,12 @@ function copyCode(){
   if(navigator.vibrate) navigator.vibrate(50);
 }
 
+// Fire on load
+recordVisit();
 loadStats();
-setInterval(loadStats, 4000);
+
+// Poll live ping and uptime every 5 seconds
+setInterval(loadStats, 5000);
 </script>
 </body>
 </html>
