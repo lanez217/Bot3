@@ -12,12 +12,41 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 let activePairingCode = null;
-let totalVisitors = 0; // Tracks total website visits
 
-// Real stats & visitor API endpoint
+// Persistent Visitor Count System
+const VISITORS_FILE = path.join(__dirname, 'visitors.json');
+
+function getVisitorCount() {
+    try {
+        if (fs.existsSync(VISITORS_FILE)) {
+            const data = fs.readFileSync(VISITORS_FILE, 'utf8');
+            return JSON.parse(data).count || 0;
+        }
+    } catch (e) {
+        console.error('Error reading visitor file:', e.message);
+    }
+    return 0;
+}
+
+function saveVisitorCount(count) {
+    try {
+        fs.writeFileSync(VISITORS_FILE, JSON.stringify({ count }), 'utf8');
+    } catch (e) {
+        console.error('Error saving visitor file:', e.message);
+    }
+}
+
+let totalVisitors = getVisitorCount();
+
+// Triggers ONLY ONCE per real page load/refresh
+app.get('/api/visit', (req, res) => {
+    totalVisitors++;
+    saveVisitorCount(totalVisitors);
+    res.json({ visitors: totalVisitors });
+});
+
+// Handles stats polling (node state, uptime, ping) without inflating views
 app.get('/api/stats', (req, res) => {
-    totalVisitors++; // Count visit on request
-    
     const totalSeconds = Math.floor(process.uptime());
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -31,14 +60,13 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
-// Pairing code endpoint
+// WhatsApp Bot Pairing Endpoint
 app.post('/pair', async (req, res) => {
     const { number } = req.body;
     if (!number) return res.status(400).json({ error: 'Phone number is required.' });
 
     console.log(`📱 Pairing code requested for: ${number}`);
 
-    // Clear session to prevent connection locks
     const sessionPath = path.join(__dirname, 'auth_info_lanez');
     if (fs.existsSync(sessionPath)) {
         try {
@@ -51,12 +79,10 @@ app.post('/pair', async (req, res) => {
 
     activePairingCode = null;
 
-    // Trigger Baileys pairing
     startBot(number, (code) => {
         activePairingCode = code;
     });
 
-    // Poll for generated pairing code
     let attempts = 0;
     while (!activePairingCode && attempts < 20) {
         await new Promise((r) => setTimeout(r, 500));
@@ -70,10 +96,9 @@ app.post('/pair', async (req, res) => {
     }
 });
 
-// Start default bot loop on boot
 startBot();
 
-// Render Keep-Alive Ping
+// Keep-Alive Ping for Render Hosting
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_URL) {
     setInterval(async () => {
@@ -85,5 +110,4 @@ process.on('uncaughtException', (err) => console.error('Uncaught Exception:', er
 process.on('unhandledRejection', (reason) => console.error('Unhandled Rejection:', reason));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
-        
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
